@@ -3,6 +3,7 @@ import StatCard from '../../components/ui/StatCard';
 import Badge from '../../components/ui/Badge';
 import { apiRequest } from '../../services/api';
 import { formatCurrency } from '../../services/calcService';
+import { useTheme } from '../../context/ThemeContext';
 import {
   DollarSign,
   TrendingUp,
@@ -25,6 +26,7 @@ import {
 } from 'recharts';
 
 export default function DashboardPage() {
+  const { isDark } = useTheme();
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,7 +49,7 @@ export default function DashboardPage() {
   if (isLoading || !stats) {
     return (
       <div className="p-6 max-w-7xl mx-auto flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-sky-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#C0392B] dark:border-[#E74C3C]"></div>
       </div>
     );
   }
@@ -56,11 +58,11 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Top Banner */}
-      <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-sky-950/40">
+      {/* Executive Operations Banner */}
+      <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">Executive Operations Dashboard</h2>
-          <p className="text-xs text-slate-400 mt-1">Real-time financial performance, inventory alerts, and sales analytics</p>
+          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-[#F1F1F1] tracking-tight">Executive Operations Dashboard</h2>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1">Real-time financial performance, inventory alerts, and sales analytics</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -134,13 +136,13 @@ export default function DashboardPage() {
 
       {/* Chart & Insights Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sales Trend Chart (2 Cols) */}
-        <div className="lg:col-span-2 glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+        {/* Dynamic Theme-Aware Recharts Sales Trend (2 Cols) */}
+        <div className="lg:col-span-2 glass-panel p-5 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-[#F1F1F1]">
               7-Day Sales Revenue Trend (₹)
             </h3>
-            <span className="text-xs text-slate-400">Auto-updating</span>
+            <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">Auto-updating</span>
           </div>
 
           <div className="h-64 w-full">
@@ -149,22 +151,28 @@ export default function DashboardPage() {
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0284c7" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0}/>
+                      <stop offset="5%" stopColor={isDark ? "#E74C3C" : "#C0392B"} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={isDark ? "#E74C3C" : "#C0392B"} stopOpacity={0.0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickFormatter={(v) => `₹${v}`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#2D3138" : "#E2E8F0"} vertical={false} />
+                  <XAxis dataKey="date" stroke={isDark ? "#9CA3AF" : "#475569"} fontSize={11} />
+                  <YAxis stroke={isDark ? "#9CA3AF" : "#475569"} fontSize={11} tickFormatter={(v) => `₹${v}`} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                    contentStyle={{
+                      backgroundColor: isDark ? '#1E2126' : '#FFFFFF',
+                      borderColor: isDark ? '#2D3138' : '#E2E8F0',
+                      borderRadius: '12px',
+                      color: isDark ? '#F1F1F1' : '#0F172A',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
                     formatter={(val) => [formatCurrency(val), 'Revenue']}
                   />
-                  <Area type="monotone" dataKey="sales" stroke="#38bdf8" strokeWidth={3} fillOpacity={1} fill="url(#salesGrad)" />
+                  <Area type="monotone" dataKey="sales" stroke={isDark ? "#E74C3C" : "#C0392B"} strokeWidth={3} fillOpacity={1} fill="url(#salesGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
+              <div className="h-full flex items-center justify-center text-xs text-slate-500 dark:text-[#9CA3AF]">
                 No recent sales chart data to display yet
               </div>
             )}
@@ -172,23 +180,23 @@ export default function DashboardPage() {
         </div>
 
         {/* Highest Margin Profit Products (1 Col) */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+        <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-4 shadow-sm">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-[#F1F1F1]">
             Top Margin Products
           </h3>
 
           <div className="space-y-3">
             {insights.topProfitable && insights.topProfitable.map((p) => (
-              <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-[#FAFAF8] dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138]">
                 <div>
-                  <p className="text-xs font-bold text-slate-100">{p.name}</p>
-                  <p className="text-[10px] text-slate-400">Cost: {formatCurrency(p.purchase_price)} → Price: {formatCurrency(p.selling_price)}</p>
+                  <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1]">{p.name}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-[#9CA3AF]">Cost: {formatCurrency(p.purchase_price)} → Price: {formatCurrency(p.selling_price)}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs font-extrabold text-emerald-400 flex items-center gap-0.5 justify-end">
+                  <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 justify-end">
                     <ArrowUpRight className="w-3.5 h-3.5" /> +{formatCurrency(p.unit_profit)}
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-400">{p.profit_margin_percent.toFixed(1)}% margin</span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-[#9CA3AF]">{p.profit_margin_percent.toFixed(1)}% margin</span>
                 </div>
               </div>
             ))}

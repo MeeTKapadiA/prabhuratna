@@ -23,7 +23,23 @@ export async function apiRequest(endpoint, method = 'GET', data = null, customHe
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const result = await response.json();
+    
+    // Check if response has content-type application/json
+    const contentType = response.headers.get('content-type');
+    let result;
+
+    if (contentType && contentType.includes('application/json')) {
+      result = await response.json();
+    } else {
+      // Non-JSON response (e.g., HTML 404 page from static host fallback)
+      const text = await response.text();
+      console.error(`Non-JSON Response (${response.status}) from ${endpoint}:`, text.slice(0, 200));
+
+      if (!response.ok) {
+        throw new Error(`API server endpoint unreachable (${response.status}). Please verify backend service configuration.`);
+      }
+      throw new Error('Server returned invalid non-JSON format.');
+    }
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -31,12 +47,15 @@ export async function apiRequest(endpoint, method = 'GET', data = null, customHe
         localStorage.removeItem('prabhuratna_token');
         localStorage.removeItem('prabhuratna_user');
       }
-      throw new Error(result.message || 'API request failed');
+      throw new Error(result.message || `API request failed with status ${response.status}`);
     }
 
     return result;
   } catch (error) {
     console.error(`API Error (${method} ${endpoint}):`, error);
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network Error: Cannot connect to backend server. Please check internet connection or server status.');
+    }
     throw error;
   }
 }

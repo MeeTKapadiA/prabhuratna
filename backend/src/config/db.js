@@ -14,12 +14,29 @@ function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      username TEXT,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       role TEXT DEFAULT 'admin',
+      status TEXT DEFAULT 'active',
+      last_login DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migrations for Users Table in SQLite
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN username TEXT`);
+  } catch (e) {}
+  try {
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN last_login DATETIME`);
+  } catch (e) {}
 
   // Products Table
   db.exec(`
@@ -44,12 +61,9 @@ function initDb() {
     );
   `);
 
-  // Migration: Add show_on_website if it doesn't exist
   try {
     db.exec(`ALTER TABLE products ADD COLUMN show_on_website INTEGER DEFAULT 1`);
-  } catch (e) {
-    // Column already exists
-  }
+  } catch (e) {}
 
   // Invoices Table
   db.exec(`
@@ -63,7 +77,7 @@ function initDb() {
       tax_amount REAL NOT NULL,
       discount_amount REAL DEFAULT 0,
       grand_total REAL NOT NULL,
-      payment_mode TEXT NOT NULL, -- 'CASH', 'UPI', 'CARD', 'MIXED'
+      payment_mode TEXT NOT NULL,
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -100,7 +114,7 @@ function initDb() {
       discount_amount REAL DEFAULT 0,
       grand_total REAL NOT NULL,
       notes TEXT,
-      status TEXT DEFAULT 'PENDING', -- 'PENDING', 'ACCEPTED', 'REJECTED'
+      status TEXT DEFAULT 'PENDING',
       valid_until DATE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -128,7 +142,7 @@ function initDb() {
     CREATE TABLE IF NOT EXISTS inventory_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       product_id INTEGER NOT NULL,
-      change_type TEXT NOT NULL, -- 'SALE', 'PURCHASE', 'MANUAL_ADJUSTMENT'
+      change_type TEXT NOT NULL,
       quantity_change INTEGER NOT NULL,
       previous_stock INTEGER NOT NULL,
       new_stock INTEGER NOT NULL,
@@ -138,15 +152,37 @@ function initDb() {
     );
   `);
 
-  // Seed default admin user if non-existent
-  const userCheck = db.prepare('SELECT COUNT(*) as count FROM users').get();
-  if (userCheck.count === 0) {
-    const hashedPassword = bcrypt.hashSync('admin123', 10);
+  // Seed default admin & staff users
+  const adminCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get('admin@prabhuratna.com', 'admin');
+  if (!adminCheck) {
+    const hashedAdminPass = bcrypt.hashSync('Admin@123', 10);
     db.prepare(`
-      INSERT INTO users (name, email, password, role)
-      VALUES (?, ?, ?, ?)
-    `).run('Admin Manager', 'admin@prabhuratna.com', hashedPassword, 'admin');
-    console.log('Seeded default admin user: admin@prabhuratna.com / admin123');
+      INSERT INTO users (name, username, email, password, role, status)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run('System Admin', 'admin', 'admin@prabhuratna.com', hashedAdminPass, 'admin', 'active');
+  } else {
+    const hashedAdminPass = bcrypt.hashSync('Admin@123', 10);
+    db.prepare(`
+      UPDATE users 
+      SET username = 'admin', password = ?, role = 'admin', status = 'active'
+      WHERE id = ?
+    `).run(hashedAdminPass, adminCheck.id);
+  }
+
+  const staffCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get('staff@prabhuratna.com', 'staff');
+  if (!staffCheck) {
+    const hashedStaffPass = bcrypt.hashSync('Staff@123', 10);
+    db.prepare(`
+      INSERT INTO users (name, username, email, password, role, status)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run('Store Staff', 'staff', 'staff@prabhuratna.com', hashedStaffPass, 'staff', 'active');
+  } else {
+    const hashedStaffPass = bcrypt.hashSync('Staff@123', 10);
+    db.prepare(`
+      UPDATE users 
+      SET username = 'staff', password = ?, role = 'staff', status = 'active'
+      WHERE id = ?
+    `).run(hashedStaffPass, staffCheck.id);
   }
 
   // Seed default demo products if empty
@@ -170,7 +206,6 @@ function initDb() {
     for (const p of sampleProducts) {
       insertProd.run(...p);
     }
-    console.log('Seeded sample products.');
   }
 }
 

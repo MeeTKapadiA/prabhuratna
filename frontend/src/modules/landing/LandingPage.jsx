@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { getDefaultRouteForUser } from '../../config/navConfig';
 import AuthModal from '../auth/AuthModal';
 import Button from '../../components/ui/Button';
 import { apiRequest } from '../../services/api';
@@ -929,7 +930,7 @@ export default function LandingPage() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         initialMode="login"
-        onSuccess={() => navigate('/app/dashboard')}
+        onSuccess={(user) => navigate(getDefaultRouteForUser(user))}
       />
     </div>
   );

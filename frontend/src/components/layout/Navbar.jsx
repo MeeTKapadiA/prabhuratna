@@ -16,12 +16,12 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
   }, []);
 
   return (
-    <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between flex-nowrap transition-colors">
+    <header className="h-16 border-b border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between flex-nowrap transition-colors shadow-xs">
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger */}
         <button
           onClick={toggleSidebar}
-          className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-[#F1F1F1] hover:bg-slate-100 dark:hover:bg-[#121417]"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -30,26 +30,26 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
         <button
           onClick={toggleSidebarCollapse}
           title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          className="hidden lg:flex p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="hidden lg:flex p-2 rounded-xl text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-[#F1F1F1] hover:bg-slate-100 dark:hover:bg-[#121417] transition-colors"
         >
           {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
         </button>
 
         <Link to="/app/dashboard" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/20 font-bold text-white text-lg flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-[#C0392B] dark:bg-[#E74C3C] flex items-center justify-center font-bold text-white text-lg flex-shrink-0 shadow-sm">
             P
           </div>
           <div className="hidden sm:block">
-            <h1 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-none">PRABHURATNA</h1>
-            <p className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold tracking-wider uppercase">ERP & Billing POS</p>
+            <h1 className="text-base font-bold text-slate-900 dark:text-[#F1F1F1] leading-none">PRABHURATNA</h1>
+            <p className="text-[10px] text-[#C0392B] dark:text-[#E74C3C] font-bold tracking-wider uppercase">ERP & Billing POS</p>
           </div>
         </Link>
       </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">
         {/* Real-time Clock */}
-        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 font-mono">
-          <Clock className="w-3.5 h-3.5 text-sky-500" />
+        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAFAF8] dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138] text-xs text-slate-700 dark:text-[#9CA3AF] font-mono">
+          <Clock className="w-3.5 h-3.5 text-[#C0392B] dark:text-[#E74C3C]" />
           <span>{time}</span>
         </div>
 
@@ -57,25 +57,25 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
         <button
           onClick={toggleTheme}
           title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
-          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700 text-amber-500 dark:text-amber-400 border border-slate-300 dark:border-slate-700/60 transition-colors"
+          className="p-2 rounded-xl bg-[#FAFAF8] dark:bg-[#121417] hover:bg-slate-200 dark:hover:bg-[#2D3138] text-amber-500 dark:text-amber-400 border border-slate-200 dark:border-[#2D3138] transition-colors"
         >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#4A5568]" />}
         </button>
 
         {/* Quick POS Billing CTA */}
         <Link
           to="/app/billing"
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-xs shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#C0392B] dark:bg-[#E74C3C] hover:bg-[#A93226] text-white font-semibold text-xs shadow-sm transition-all active:scale-95 whitespace-nowrap"
         >
           <ShoppingCart className="w-4 h-4" />
           <span className="hidden sm:inline">Quick POS Billing</span>
         </Link>
 
         {/* User Profile & Logout */}
-        <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-[#2D3138]">
           <div className="text-right hidden xl:block">
-            <p className="text-xs font-semibold text-slate-900 dark:text-slate-200">{user?.name || 'Admin User'}</p>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">{user?.role || 'Store Manager'}</p>
+            <p className="text-xs font-semibold text-slate-900 dark:text-[#F1F1F1]">{user?.name || 'Admin User'}</p>
+            <p className="text-[10px] text-slate-500 dark:text-[#9CA3AF] capitalize">{user?.role || 'Store Manager'}</p>
           </div>
           <button
             onClick={() => {
@@ -83,7 +83,7 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
               navigate('/');
             }}
             title="Log Out"
-            className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 border border-rose-500/20 transition-colors"
+            className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition-colors"
           >
             <LogOut className="w-4 h-4" />
           </button>

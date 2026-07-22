@@ -8,9 +8,9 @@
   --color-steel: #4A5568;
   --color-accent: #C0392B;
   --color-accent-hover: #A93226;
-  --color-text: #1A1A1A;
-  --color-text-sec: #6B7280;
-  --color-border: #E5E7EB;
+  --color-text: #0F172A;
+  --color-text-sec: #475569;
+  --color-border: #E2E8F0;
 }
 
 html.dark {
@@ -53,16 +53,15 @@ html:not(.dark) ::-webkit-scrollbar-track {
   background: #FAFAF8;
 }
 html:not(.dark) ::-webkit-scrollbar-thumb {
-  background: #E5E7EB;
+  background: #E2E8F0;
   border-radius: 9999px;
 }
 
-/* Theme Glass Panels & Cards */
+/* Unified Theme Panels & Cards */
 .glass-panel {
   background-color: var(--color-surface);
   border-color: var(--color-border);
   color: var(--color-text);
-  backdrop-filter: blur(8px);
   border-style: solid;
   border-width: 1px;
 }
@@ -71,7 +70,6 @@ html:not(.dark) ::-webkit-scrollbar-thumb {
   background-color: var(--color-surface);
   border-color: var(--color-border);
   color: var(--color-text);
-  backdrop-filter: blur(4px);
   border-style: solid;
   border-width: 1px;
 }
@@ -87,21 +85,48 @@ html:not(.dark) ::-webkit-scrollbar-thumb {
   box-shadow: 0 4px 14px rgba(192, 57, 43, 0.3);
 }
 
-/* Print Styles */
+/* Enhanced Professional Print Styles */
 @media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
   body {
     background: #ffffff !important;
     color: #000000 !important;
+    font-size: 11pt;
   }
-  .no-print {
+
+  header, aside, nav, footer, .no-print, button, input, select {
     display: none !important;
   }
+
   .print-only {
     display: block !important;
   }
+
   .glass-panel, .glass-card {
     background: #ffffff !important;
     border: none !important;
     box-shadow: none !important;
+    color: #000000 !important;
+    padding: 0 !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    color: #000000 !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
   }
 }

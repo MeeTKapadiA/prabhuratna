@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/reportController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
-router.get('/sales', authenticateToken, reportController.getSalesReport);
-router.get('/inventory', authenticateToken, reportController.getInventoryReport);
-router.get('/profit', authenticateToken, reportController.getProfitReport);
+// All Reports endpoints are restricted to Admin role only
+router.use(authenticateToken, requireRole(['admin']));
+
+router.get('/sales', reportController.getSalesReport);
+router.get('/inventory', reportController.getInventoryReport);
+router.get('/profit', reportController.getProfitReport);
 
 module.exports = router;

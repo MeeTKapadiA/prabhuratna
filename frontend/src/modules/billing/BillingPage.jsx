@@ -99,41 +99,45 @@ export default function BillingPage() {
         fetchProductByBarcode(decodedText);
         setIsCameraScannerOpen(false);
         scanner.clear();
-      }, (error) => {});
+      }, (error) => {
+        // ignore scan errors
+      });
     }
     return () => {
       if (scanner) {
-        scanner.clear().catch(e => console.error(e));
+        scanner.clear().catch(() => {});
       }
     };
   }, [isCameraScannerOpen]);
 
   const addToCart = (product) => {
-    if (product.stock_quantity <= 0) {
-      showToast(`Warning: ${product.name} is Out of Stock!`, 'warning');
-    }
-
     setCartItems((prev) => {
       const existingIdx = prev.findIndex((item) => item.product_id === product.id);
       if (existingIdx > -1) {
         const updated = [...prev];
+        const currentQty = updated[existingIdx].quantity;
+        if (currentQty + 1 > product.stock_quantity) {
+          showToast(`Warning: Cannot exceed stock level (${product.stock_quantity})`, 'warning');
+          return prev;
+        }
         updated[existingIdx].quantity += 1;
-        updated[existingIdx].total_price = (updated[existingIdx].unit_price * updated[existingIdx].quantity);
         return updated;
       } else {
-        const unitPrice = product.selling_price;
+        if (product.stock_quantity < 1) {
+          showToast(`Cannot add ${product.name}: Out of Stock`, 'error');
+          return prev;
+        }
         return [
           ...prev,
           {
             product_id: product.id,
             product_name: product.name,
-            sku: product.sku,
             barcode: product.barcode,
-            unit_price: unitPrice,
-            quantity: 1, // default 1
+            sku: product.sku,
+            unit_price: product.selling_price,
+            quantity: 1,
             discount_percent: product.discount_percent || 0,
             gst_percent: product.gst_percent || 18,
-            total_price: unitPrice,
             max_stock: product.stock_quantity
           }
         ];
@@ -141,36 +145,46 @@ export default function BillingPage() {
     });
   };
 
-  const updateQuantity = (index, delta) => {
+  const updateQuantity = (idx, newQty) => {
+    if (newQty < 1) return;
     setCartItems((prev) => {
       const updated = [...prev];
-      const newQty = updated[index].quantity + delta;
-      if (newQty <= 0) {
-        return updated.filter((_, idx) => idx !== index);
+      if (newQty > updated[idx].max_stock) {
+        showToast(`Stock limit reached (${updated[idx].max_stock})`, 'warning');
+        return prev;
       }
-      updated[index].quantity = newQty;
+      updated[idx].quantity = newQty;
       return updated;
     });
   };
 
-  const updateItemField = (index, field, val) => {
+  const updateDiscount = (idx, disc) => {
+    const val = Math.max(0, Math.min(100, parseFloat(disc) || 0));
     setCartItems((prev) => {
       const updated = [...prev];
-      updated[index][field] = parseFloat(val) || 0;
+      updated[idx].discount_percent = val;
       return updated;
     });
   };
 
-  const removeItem = (index) => {
-    setCartItems((prev) => prev.filter((_, idx) => idx !== index));
+  const updateGst = (idx, gst) => {
+    const val = Math.max(0, parseFloat(gst) || 0);
+    setCartItems((prev) => {
+      const updated = [...prev];
+      updated[idx].gst_percent = val;
+      return updated;
+    });
   };
 
-  const totals = calculateCartTotals(cartItems, overallDiscount);
+  const removeFromCart = (idx) => {
+    setCartItems((prev) => prev.filter((_, i) => i !== idx));
+  };
 
-  // Complete Billing Checkout
+  const cartTotals = calculateCartTotals(cartItems, overallDiscount);
+
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
-      showToast('Cart is empty! Scan barcodes to start billing.', 'error');
+      showToast('Cart is empty. Scan items or search to add.', 'error');
       return;
     }
 
@@ -180,25 +194,21 @@ export default function BillingPage() {
         customer_name: customerName,
         customer_phone: customerPhone,
         customer_email: customerEmail,
-        subtotal: totals.subtotal,
-        tax_amount: totals.taxAmount,
-        discount_amount: totals.billDiscountAmount,
-        grand_total: totals.grandTotal,
         payment_mode: paymentMode,
-        notes: notes,
-        items: cartItems.map(item => ({
+        overall_discount: parseFloat(overallDiscount) || 0,
+        notes,
+        items: cartItems.map((item) => ({
           product_id: item.product_id,
           product_name: item.product_name,
           barcode: item.barcode,
           unit_price: item.unit_price,
           quantity: item.quantity,
           discount_percent: item.discount_percent,
-          gst_percent: item.gst_percent,
-          total_price: (item.unit_price * item.quantity)
+          gst_percent: item.gst_percent
         }))
       };
 
-      const res = await apiRequest('/billing/invoices', 'POST', payload);
+      const res = await apiRequest('/invoices', 'POST', payload);
       if (res.success) {
         setCompletedInvoice(res.invoice);
         setIsInvoiceModalOpen(true);
@@ -207,12 +217,12 @@ export default function BillingPage() {
         setCustomerName('Walk-in Customer');
         setCustomerPhone('');
         setCustomerEmail('');
-        setNotes('');
         setOverallDiscount(0);
-        showToast('Invoice created & stock updated!', 'success');
+        setNotes('');
+        showToast('Invoice generated successfully!', 'success');
       }
     } catch (err) {
-      showToast(err.message || 'Checkout failed', 'error');
+      showToast(err.message || 'Failed to complete transaction', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -220,30 +230,30 @@ export default function BillingPage() {
 
   return (
     <div className="p-2 sm:p-4 space-y-6 max-w-7xl mx-auto">
-      {/* Top POS Action Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-4 rounded-2xl border border-slate-800">
+      {/* Top Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-100 dark:text-slate-100 light:text-slate-900 flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-sky-500" /> POS Barcode Billing Terminal
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-[#C0392B] dark:text-[#E74C3C]" /> Express POS Counter Billing
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">Scan barcode for instant auto-fill or search manually</p>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">High-speed barcode scanner billing, automated GST calculation, and instant invoices</p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => setIsSearchModalOpen(true)}
-            variant="secondary"
-            icon={Search}
-          >
-            Manual Search
-          </Button>
-
-          <Button
             onClick={() => setIsCameraScannerOpen(true)}
-            variant="outline"
+            variant="secondary"
             icon={Camera}
           >
             Camera Scanner
+          </Button>
+
+          <Button
+            onClick={() => setIsSearchModalOpen(true)}
+            variant="primary"
+            icon={Search}
+          >
+            Search Catalog
           </Button>
         </div>
       </div>
@@ -252,9 +262,9 @@ export default function BillingPage() {
         {/* Left 2 Cols: Cart Table & Barcode Input */}
         <div className="lg:col-span-2 space-y-4">
           {/* Barcode Gun Input Field */}
-          <div className="glass-panel p-4 rounded-2xl border border-slate-800">
+          <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
             <div className="relative">
-              <ScanBarcode className="absolute left-3.5 top-3 w-5 h-5 text-sky-500 animate-pulse" />
+              <ScanBarcode className="absolute left-3.5 top-3 w-5 h-5 text-[#C0392B] dark:text-[#E74C3C] animate-pulse" />
               <input
                 id="barcode-scanner-input"
                 type="text"
@@ -265,22 +275,22 @@ export default function BillingPage() {
                     e.target.value = '';
                   }
                 }}
-                className="w-full pl-11 pr-4 py-2.5 bg-slate-900/90 dark:bg-slate-900/90 light:bg-white border border-sky-500/40 rounded-xl text-sm font-mono text-sky-300 dark:text-sky-300 light:text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/30"
+                className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-sm font-mono text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C]"
                 autoFocus
               />
             </div>
           </div>
 
           {/* Cart Items Table */}
-          <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
-            <div className="px-5 py-3.5 bg-slate-900/80 dark:bg-slate-900/80 light:bg-slate-100 border-b border-slate-800 dark:border-slate-800 light:border-slate-200 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 dark:text-slate-300 light:text-slate-700">
+          <div className="glass-panel rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] overflow-hidden shadow-sm">
+            <div className="px-5 py-3.5 bg-[#FAFAF8] dark:bg-[#121417] border-b border-slate-200 dark:border-[#2D3138] flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-[#F1F1F1]">
                 Billing Cart ({cartItems.length} items)
               </span>
               {cartItems.length > 0 && (
                 <button
                   onClick={() => setCartItems([])}
-                  className="text-xs text-rose-400 hover:underline font-medium"
+                  className="text-xs text-rose-500 hover:underline font-semibold"
                 >
                   Clear Cart
                 </button>
@@ -288,8 +298,8 @@ export default function BillingPage() {
             </div>
 
             <div className="overflow-x-auto max-h-[50vh] overflow-y-auto">
-              <table className="w-full text-left text-xs text-slate-200 dark:text-slate-200 light:text-slate-800">
-                <thead className="bg-slate-900/50 dark:bg-slate-900/50 light:bg-slate-100 text-slate-400 border-b border-slate-800">
+              <table className="w-full text-left text-xs text-slate-900 dark:text-[#F1F1F1]">
+                <thead className="bg-[#FAFAF8] dark:bg-[#121417] text-slate-500 dark:text-[#9CA3AF] border-b border-slate-200 dark:border-[#2D3138]">
                   <tr>
                     <th className="px-4 py-3">Product Name & SKU</th>
                     <th className="px-3 py-3">Rate</th>
@@ -300,44 +310,39 @@ export default function BillingPage() {
                     <th className="px-3 py-3 text-center">Remove</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 dark:divide-slate-800/60 light:divide-slate-200">
+                <tbody className="divide-y divide-slate-200 dark:divide-[#2D3138]">
                   {cartItems.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-16 text-center text-slate-500">
-                        <ScanBarcode className="w-10 h-10 mx-auto mb-2 text-slate-600 animate-bounce" />
-                        <p className="font-semibold text-slate-400">Scan Barcode to Add Item</p>
-                        <p className="text-xs text-slate-500">Scanning automatically fills Product, SKU, Price, GST, and Disc %</p>
+                      <td colSpan={7} className="px-4 py-16 text-center text-slate-500 dark:text-[#9CA3AF]">
+                        <ScanBarcode className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-600 animate-bounce" />
+                        <p className="font-semibold text-slate-700 dark:text-[#F1F1F1]">Scan Barcode to Add Item</p>
+                        <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Scanning automatically fills Product, SKU, Price, GST, and Disc %</p>
                       </td>
                     </tr>
                   ) : (
                     cartItems.map((item, idx) => {
                       const itemTotal = (item.unit_price * item.quantity);
                       return (
-                        <tr key={idx} className="hover:bg-slate-800/40 dark:hover:bg-slate-800/40 light:hover:bg-slate-100">
-                          <td className="px-4 py-3 font-semibold text-slate-100 dark:text-slate-100 light:text-slate-900">
+                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#121417]/50 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-[#F1F1F1]">
                             <div>{item.product_name}</div>
-                            <div className="text-[10px] font-mono text-slate-400">SKU: {item.sku} | Barcode: {item.barcode}</div>
+                            <div className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">SKU: {item.sku} | Barcode: {item.barcode}</div>
                           </td>
-                          <td className="px-3 py-3">
-                            <input
-                              type="number"
-                              value={item.unit_price}
-                              onChange={(e) => updateItemField(idx, 'unit_price', e.target.value)}
-                              className="w-20 px-2 py-1 bg-slate-900 dark:bg-slate-900 light:bg-white border border-slate-700 rounded text-right text-xs"
-                            />
+                          <td className="px-3 py-3 font-semibold text-slate-900 dark:text-[#F1F1F1]">
+                            {formatCurrency(item.unit_price)}
                           </td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center justify-center gap-1">
+                          <td className="px-3 py-3 text-center">
+                            <div className="inline-flex items-center gap-1.5 border border-slate-300 dark:border-[#2D3138] rounded-xl p-1 bg-white dark:bg-[#121417]">
                               <button
-                                onClick={() => updateQuantity(idx, -1)}
-                                className="p-1 rounded bg-slate-800 dark:bg-slate-800 light:bg-slate-200 hover:bg-slate-700 text-slate-300"
+                                onClick={() => updateQuantity(idx, item.quantity - 1)}
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF]"
                               >
                                 <Minus className="w-3 h-3" />
                               </button>
-                              <span className="w-8 text-center font-bold">{item.quantity}</span>
+                              <span className="w-6 font-bold text-center text-slate-900 dark:text-[#F1F1F1]">{item.quantity}</span>
                               <button
-                                onClick={() => updateQuantity(idx, 1)}
-                                className="p-1 rounded bg-slate-800 dark:bg-slate-800 light:bg-slate-200 hover:bg-slate-700 text-slate-300"
+                                onClick={() => updateQuantity(idx, item.quantity + 1)}
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF]"
                               >
                                 <Plus className="w-3 h-3" />
                               </button>
@@ -347,25 +352,25 @@ export default function BillingPage() {
                             <input
                               type="number"
                               value={item.discount_percent}
-                              onChange={(e) => updateItemField(idx, 'discount_percent', e.target.value)}
-                              className="w-12 px-1 py-1 bg-slate-900 dark:bg-slate-900 light:bg-white border border-slate-700 rounded text-center text-xs"
+                              onChange={(e) => updateDiscount(idx, e.target.value)}
+                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
                             />
                           </td>
                           <td className="px-3 py-3 text-center">
                             <input
                               type="number"
                               value={item.gst_percent}
-                              onChange={(e) => updateItemField(idx, 'gst_percent', e.target.value)}
-                              className="w-12 px-1 py-1 bg-slate-900 dark:bg-slate-900 light:bg-white border border-slate-700 rounded text-center text-xs"
+                              onChange={(e) => updateGst(idx, e.target.value)}
+                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
                             />
                           </td>
-                          <td className="px-4 py-3 text-right font-bold text-sky-500">
+                          <td className="px-4 py-3 text-right font-extrabold text-[#C0392B] dark:text-[#E74C3C]">
                             {formatCurrency(itemTotal)}
                           </td>
                           <td className="px-3 py-3 text-center">
                             <button
-                              onClick={() => removeItem(idx)}
-                              className="p-1 rounded hover:bg-rose-500/20 text-rose-400"
+                              onClick={() => removeFromCart(idx)}
+                              className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -380,127 +385,136 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Right 1 Col: Customer Details, Payment & Checkout */}
+        {/* Right Col: Checkout & Calculations */}
         <div className="space-y-4">
-          <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 dark:text-slate-300 light:text-slate-700 border-b border-slate-800 pb-2">
-              Customer Information
+          <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-4 shadow-sm">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2 border-b border-slate-200 dark:border-[#2D3138] pb-3">
+              <CreditCard className="w-4 h-4 text-[#C0392B] dark:text-[#E74C3C]" /> Checkout Summary
             </h3>
 
-            <Input
-              label="Customer Name"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Walk-in Customer"
-            />
-
-            <Input
-              label="Phone Number"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="9876543210"
-            />
-          </div>
-
-          <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 dark:text-slate-300 light:text-slate-700 border-b border-slate-800 pb-2">
-              Payment Mode
-            </h3>
-
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'CASH', label: 'Cash', icon: DollarSign },
-                { id: 'UPI', label: 'UPI / QR', icon: QrCode },
-                { id: 'CARD', label: 'Card', icon: CreditCard },
-                { id: 'MIXED', label: 'Mixed Mode', icon: ShoppingBag }
-              ].map((mode) => {
-                const Icon = mode.icon;
-                const isSelected = paymentMode === mode.id;
-                return (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => setPaymentMode(mode.id)}
-                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                      isSelected
-                        ? 'bg-sky-500/20 border-sky-500 text-sky-400'
-                        : 'bg-slate-900 dark:bg-slate-900 light:bg-slate-100 border-slate-800 dark:border-slate-800 light:border-slate-300 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{mode.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <Input
-              label="Overall Bill Discount (%)"
-              type="number"
-              value={overallDiscount}
-              onChange={(e) => setOverallDiscount(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-
-          {/* Grand Total Summary Box */}
-          <div className="glass-panel p-5 rounded-2xl border border-sky-500/30 bg-gradient-to-b from-sky-950/20 to-slate-900 space-y-3">
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>Subtotal:</span>
-              <span className="font-semibold text-slate-200 dark:text-slate-200 light:text-slate-800">{formatCurrency(totals.subtotal)}</span>
-            </div>
-
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>GST Tax Amount:</span>
-              <span className="font-semibold text-slate-200 dark:text-slate-200 light:text-slate-800">{formatCurrency(totals.taxAmount)}</span>
-            </div>
-
-            {totals.billDiscountAmount > 0 && (
-              <div className="flex justify-between text-xs text-emerald-400">
-                <span>Bill Discount:</span>
-                <span>- {formatCurrency(totals.billDiscountAmount)}</span>
+            {/* Customer Details */}
+            <div className="space-y-3">
+              <Input
+                label="Customer Name"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Walk-in Customer"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Phone Number"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="10-digit Mobile"
+                />
+                <Input
+                  label="Overall Disc (₹)"
+                  type="number"
+                  value={overallDiscount}
+                  onChange={(e) => setOverallDiscount(e.target.value)}
+                  placeholder="0"
+                />
               </div>
-            )}
-
-            <div className="border-t border-slate-800 pt-3 flex justify-between items-baseline">
-              <span className="text-sm font-bold text-slate-100 dark:text-slate-100 light:text-slate-900">Grand Total:</span>
-              <span className="text-2xl font-extrabold text-sky-400">{formatCurrency(totals.grandTotal)}</span>
             </div>
 
+            {/* Payment Mode Selector */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
+                Payment Mode
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { id: 'CASH', label: 'Cash', icon: DollarSign },
+                  { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                  { id: 'CARD', label: 'Card', icon: CreditCard },
+                  { id: 'MIXED', label: 'Split', icon: Plus }
+                ].map((mode) => {
+                  const Icon = mode.icon;
+                  const isSelected = paymentMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setPaymentMode(mode.id)}
+                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-bold border transition-all ${
+                        isSelected
+                          ? 'bg-[#C0392B]/10 dark:bg-[#E74C3C]/10 border-[#C0392B] dark:border-[#E74C3C] text-[#C0392B] dark:text-[#E74C3C]'
+                          : 'bg-white dark:bg-[#121417] border-slate-200 dark:border-[#2D3138] text-slate-600 dark:text-[#9CA3AF] hover:bg-slate-100 dark:hover:bg-[#1E2126]'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 mb-1" />
+                      <span>{mode.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Price Calculations */}
+            <div className="p-3.5 rounded-xl bg-[#FAFAF8] dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138] space-y-2 text-xs">
+              <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                <span>Items Subtotal:</span>
+                <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">{formatCurrency(cartTotals.subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                <span>Item Level Discounts:</span>
+                <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.totalItemDiscount)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                <span>Estimated Tax (GST):</span>
+                <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(cartTotals.totalGst)}</span>
+              </div>
+              {cartTotals.overallDiscount > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                  <span>Flat Cash Discount:</span>
+                  <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.overallDiscount)}</span>
+                </div>
+              )}
+              <div className="pt-2 border-t border-slate-200 dark:border-[#2D3138] flex justify-between items-center text-sm">
+                <span className="font-extrabold text-slate-900 dark:text-[#F1F1F1]">Grand Total:</span>
+                <span className="text-xl font-extrabold text-[#C0392B] dark:text-[#E74C3C]">
+                  {formatCurrency(cartTotals.grandTotal)}
+                </span>
+              </div>
+            </div>
+
+            {/* Complete Checkout CTA Button */}
             <Button
               onClick={handleCheckout}
-              variant="success"
-              size="lg"
+              variant="primary"
               fullWidth
+              size="lg"
               isLoading={isLoading}
-              isDisabled={cartItems.length === 0}
+              disabled={cartItems.length === 0}
               icon={CheckCircle}
             >
-              Complete Bill & Generate Invoice
+              Complete Sale & Print Receipt
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Manual Search Modal */}
+      {/* Manual Search Product Modal */}
       <Modal
         isOpen={isSearchModalOpen}
         onClose={() => setIsSearchModalOpen(false)}
-        title="Search & Add Product"
-        subtitle="Lookup products by Name, Barcode, or SKU"
+        title="Search Product Catalog"
+        subtitle="Search products by name, SKU or barcode to add to current bill"
       >
         <div className="space-y-4">
           <SearchBar
             value={manualSearch}
             onChange={setManualSearch}
             onClear={() => setManualSearch('')}
-            placeholder="Type product name, barcode..."
+            placeholder="Type product name, brand, SKU..."
             autoFocus
           />
 
           <div className="max-h-60 overflow-y-auto space-y-2">
             {searchResults.length === 0 ? (
-              <p className="text-center text-xs text-slate-500 py-6">Type at least 2 characters to search products</p>
+              <p className="text-xs text-center py-6 text-slate-500 dark:text-[#9CA3AF]">
+                {manualSearch ? 'No products match search query' : 'Type at least 2 characters to search'}
+              </p>
             ) : (
               searchResults.map((prod) => (
                 <div
@@ -508,17 +522,18 @@ export default function BillingPage() {
                   onClick={() => {
                     addToCart(prod);
                     setIsSearchModalOpen(false);
-                    showToast(`Added ${prod.name}`, 'success');
+                    setManualSearch('');
+                    showToast(`Added ${prod.name} to cart!`, 'success');
                   }}
-                  className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-sky-500 cursor-pointer transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138] hover:border-[#C0392B] dark:hover:border-[#E74C3C] cursor-pointer transition-all"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-slate-100">{prod.name}</p>
-                    <p className="text-xs text-slate-400 font-mono">Barcode: {prod.barcode} | Stock: {prod.stock_quantity}</p>
+                    <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1]">{prod.name}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku} | Barcode: {prod.barcode} | Stock: {prod.stock_quantity}</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-sm font-bold text-sky-400">{formatCurrency(prod.selling_price)}</span>
-                    <Badge variant={prod.stock_quantity > 0 ? 'success' : 'danger'} size="sm" className="block mt-1">
+                    <p className="text-xs font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(prod.selling_price)}</p>
+                    <Badge variant={prod.stock_quantity > 0 ? 'success' : 'danger'}>
                       {prod.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
                     </Badge>
                   </div>
@@ -529,26 +544,34 @@ export default function BillingPage() {
         </div>
       </Modal>
 
-      {/* Camera Scanner Modal */}
+      {/* Camera Barcode Scanner Modal */}
       <Modal
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
-        title="Mobile Camera Barcode Scanner"
-        subtitle="Point camera at product barcode"
+        title="Webcam Barcode Scanner"
+        subtitle="Point device camera at 1D Barcode label to scan item into bill"
       >
-        <div className="flex flex-col items-center">
-          <div id="reader" className="w-full max-w-sm border border-slate-700 rounded-xl overflow-hidden" />
+        <div className="space-y-4 text-center">
+          <div id="reader" className="w-full max-w-sm mx-auto overflow-hidden rounded-xl border border-slate-200 dark:border-[#2D3138]"></div>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Position barcode clearly within box frame</p>
         </div>
       </Modal>
 
-      {/* Post Checkout Invoice Modal */}
+      {/* Post Checkout Completed Invoice Modal */}
       <Modal
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}
         title="Invoice Generated Successfully"
         subtitle={`Invoice No: ${completedInvoice?.invoice_number}`}
         footer={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button
+              onClick={() => window.print()}
+              variant="secondary"
+              icon={Printer}
+            >
+              Print Invoice
+            </Button>
             <Button
               onClick={() => generateInvoicePDF(completedInvoice)}
               variant="primary"
@@ -563,47 +586,35 @@ export default function BillingPage() {
         }
       >
         {completedInvoice && (
-          <div className="space-y-4 text-xs">
-            <div className="flex justify-between p-3 bg-slate-900 rounded-xl border border-slate-800">
-              <div>
-                <p className="text-slate-400">Customer Name:</p>
-                <p className="font-bold text-slate-100">{completedInvoice.customer_name}</p>
+          <div className="space-y-4 py-2 text-xs text-slate-900 dark:text-[#F1F1F1]">
+            <div className="p-4 rounded-xl bg-[#FAFAF8] dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138] space-y-2">
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-[#9CA3AF]">Customer Name:</span>
+                <span className="font-bold">{completedInvoice.customer_name}</span>
               </div>
-              <div>
-                <p className="text-slate-400">Payment Mode:</p>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-[#9CA3AF]">Payment Method:</span>
                 <Badge variant="info">{completedInvoice.payment_mode}</Badge>
               </div>
-              <div>
-                <p className="text-slate-400">Grand Total:</p>
-                <p className="font-extrabold text-sky-400 text-sm">{formatCurrency(completedInvoice.grand_total)}</p>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-[#9CA3AF]">Date & Time:</span>
+                <span>{new Date(completedInvoice.created_at).toLocaleString('en-IN')}</span>
               </div>
-            </div>
-
-            <div className="border border-slate-800 rounded-xl overflow-hidden">
-              <table className="w-full text-left">
-                <thead className="bg-slate-900 text-slate-400">
-                  <tr>
-                    <th className="p-2">Item</th>
-                    <th className="p-2">Qty</th>
-                    <th className="p-2 text-right">Price</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {completedInvoice.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="p-2 font-medium">{it.product_name}</td>
-                      <td className="p-2">{it.quantity}</td>
-                      <td className="p-2 text-right font-bold">{formatCurrency(it.total_price)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="flex justify-between text-sm font-extrabold pt-2 border-t border-slate-200 dark:border-[#2D3138]">
+                <span>Total Paid Amount:</span>
+                <span className="text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(completedInvoice.grand_total)}</span>
+              </div>
             </div>
           </div>
         )}
       </Modal>
 
-      <Toast {...toast} onClose={() => setToast((t) => ({ ...t, isOpen: false }))} />
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={() => setToast({ ...toast, isOpen: false })}
+      />
     </div>
   );
 }

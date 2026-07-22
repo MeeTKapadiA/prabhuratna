@@ -9,7 +9,7 @@ import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
 import { calculateCartTotals, formatCurrency } from '../../services/calcService';
 import { generateQuotationPDF } from '../../services/pdfService';
-import { FileText, Plus, Download, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { FileText, Plus, Download, Printer, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function QuotationsPage() {
   const [quotations, setQuotations] = useState([]);
@@ -24,13 +24,13 @@ export default function QuotationsPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  const [validUntil, setValidUntil] = useState('');
+  const [validDays, setValidDays] = useState('15');
   const [notes, setNotes] = useState('');
 
-  // Selected Products in Quotation
+  // Item Selector State
   const [qtnItems, setQtnItems] = useState([]);
   const [prodSearch, setProdSearch] = useState('');
-  const [prodResults, setProdResults] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
 
   const [toast, setToast] = useState({ isOpen: false, type: 'info', message: '' });
 
@@ -52,30 +52,32 @@ export default function QuotationsPage() {
     fetchQuotations();
   }, [search]);
 
-  // Search Products for adding to quotation
+  // Search Products for Adding to Quotation
   useEffect(() => {
     if (prodSearch.trim().length > 1) {
       const timer = setTimeout(async () => {
         try {
           const res = await apiRequest(`/products?search=${encodeURIComponent(prodSearch)}`);
-          if (res.success) setProdResults(res.products);
-        } catch (e) {
-          console.error(e);
+          if (res.success) {
+            setSearchResults(res.products);
+          }
+        } catch (err) {
+          console.error(err);
         }
       }, 300);
       return () => clearTimeout(timer);
     } else {
-      setProdResults([]);
+      setSearchResults([]);
     }
   }, [prodSearch]);
 
-  const addProductToQuotation = (prod) => {
+  const addItemToQuotation = (prod) => {
     setQtnItems((prev) => {
-      const existingIdx = prev.findIndex((i) => i.product_id === prod.id);
-      if (existingIdx > -1) {
-        const copy = [...prev];
-        copy[existingIdx].quantity += 1;
-        return copy;
+      const exists = prev.find((item) => item.product_id === prod.id);
+      if (exists) {
+        return prev.map((item) =>
+          item.product_id === prod.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
       }
       return [
         ...prev,
@@ -86,66 +88,60 @@ export default function QuotationsPage() {
           unit_price: prod.selling_price,
           quantity: 1,
           discount_percent: prod.discount_percent || 0,
-          gst_percent: prod.gst_percent || 18,
-          total_price: prod.selling_price
+          gst_percent: prod.gst_percent || 18
         }
       ];
     });
     setProdSearch('');
-    setProdResults([]);
+    setSearchResults([]);
   };
 
   const handleCreateQuotation = async (e) => {
     e.preventDefault();
     if (qtnItems.length === 0) {
-      setToast({ isOpen: true, type: 'error', message: 'Add at least one product to the quotation' });
+      setToast({ isOpen: true, type: 'error', message: 'Add at least one product to quotation' });
       return;
     }
 
-    const totals = calculateCartTotals(qtnItems, 0);
-
     try {
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + (parseInt(validDays) || 15));
+
       const payload = {
         customer_name: customerName,
         customer_phone: customerPhone,
         customer_email: customerEmail,
         customer_address: customerAddress,
-        valid_until: validUntil,
-        notes: notes,
-        subtotal: totals.subtotal,
-        tax_amount: totals.taxAmount,
-        discount_amount: totals.totalDiscount,
-        grand_total: totals.grandTotal,
+        notes,
+        valid_until: validUntil.toISOString().split('T')[0],
         items: qtnItems
       };
 
       const res = await apiRequest('/quotations', 'POST', payload);
       if (res.success) {
-        setToast({ isOpen: true, type: 'success', message: 'Quotation generated!' });
+        setToast({ isOpen: true, type: 'success', message: 'Quotation generated successfully!' });
         setIsModalOpen(false);
-        // Auto Download PDF
-        generateQuotationPDF(res.quotation);
-        fetchQuotations();
-        // Reset
+        setQtnItems([]);
         setCustomerName('');
         setCustomerPhone('');
         setCustomerEmail('');
         setCustomerAddress('');
-        setQtnItems([]);
+        fetchQuotations();
       }
     } catch (err) {
       setToast({ isOpen: true, type: 'error', message: err.message || 'Failed to create quotation' });
     }
   };
 
-  const handleDownloadPDF = async (qtnId) => {
+  const handleDownloadPDF = async (id) => {
     try {
-      const res = await apiRequest(`/quotations/${qtnId}`);
-      if (res.success) {
+      const res = await apiRequest(`/quotations/${id}`);
+      if (res.success && res.quotation) {
         generateQuotationPDF(res.quotation);
+        setToast({ isOpen: true, type: 'success', message: 'Quotation PDF Downloaded' });
       }
     } catch (err) {
-      setToast({ isOpen: true, type: 'error', message: 'Failed to download PDF' });
+      setToast({ isOpen: true, type: 'error', message: 'Failed to generate PDF' });
     }
   };
 
@@ -164,12 +160,12 @@ export default function QuotationsPage() {
       header: 'Quotation Details',
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 dark:text-amber-400">
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <p className="font-bold text-slate-100">{row.quotation_number}</p>
-            <p className="text-xs text-slate-400">Date: {new Date(row.created_at).toLocaleDateString('en-IN')}</p>
+            <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.quotation_number}</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Date: {new Date(row.created_at).toLocaleDateString('en-IN')}</p>
           </div>
         </div>
       )
@@ -178,15 +174,15 @@ export default function QuotationsPage() {
       header: 'Client / Company',
       render: (row) => (
         <div className="text-xs">
-          <p className="font-semibold text-slate-200">{row.customer_name}</p>
-          <p className="text-slate-400">{row.customer_phone || row.customer_email || 'N/A'}</p>
+          <p className="font-semibold text-slate-900 dark:text-[#F1F1F1]">{row.customer_name}</p>
+          <p className="text-slate-500 dark:text-[#9CA3AF]">{row.customer_phone || row.customer_email || 'N/A'}</p>
         </div>
       )
     },
     {
       header: 'Quotation Total',
       render: (row) => (
-        <span className="font-extrabold text-amber-400 text-sm">{formatCurrency(row.grand_total)}</span>
+        <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C] text-sm">{formatCurrency(row.grand_total)}</span>
       )
     },
     {
@@ -202,24 +198,31 @@ export default function QuotationsPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleDownloadPDF(row.id)}
-            title="Download PDF"
-            className="p-1.5 rounded-lg hover:bg-slate-700 text-amber-400"
+            title="Download PDF Quotation"
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-amber-600 dark:text-amber-400"
           >
             <Download className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => window.print()}
+            title="Print Quotation"
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-sky-600 dark:text-sky-400"
+          >
+            <Printer className="w-4 h-4" />
           </button>
           {row.status === 'PENDING' && (
             <>
               <button
                 onClick={() => handleStatusChange(row.id, 'ACCEPTED')}
                 title="Mark Accepted"
-                className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-400"
+                className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               >
                 <CheckCircle className="w-4 h-4" />
               </button>
               <button
                 onClick={() => handleStatusChange(row.id, 'REJECTED')}
                 title="Mark Rejected"
-                className="p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-400"
+                className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-600 dark:text-rose-400"
               >
                 <XCircle className="w-4 h-4" />
               </button>
@@ -233,13 +236,13 @@ export default function QuotationsPage() {
   const qtnTotals = calculateCartTotals(qtnItems, 0);
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-4 rounded-2xl border border-slate-800">
+    <div className="p-2 sm:p-4 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-100 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-amber-400" /> B2B Quotation Management
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
+            <FileText className="w-5 h-5 text-[#C0392B] dark:text-[#E74C3C]" /> B2B Commercial Quotation Management
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">Create commercial price estimates, download PDFs, and manage status</p>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">Create commercial price estimates, download PDFs, and manage status</p>
         </div>
 
         <Button onClick={() => setIsModalOpen(true)} variant="primary" icon={Plus}>
@@ -251,172 +254,162 @@ export default function QuotationsPage() {
         value={search}
         onChange={setSearch}
         onClear={() => setSearch('')}
-        placeholder="Filter quotations by number, customer name, phone..."
+        placeholder="Filter by quotation number, client name, or phone..."
       />
 
-      <DataTable
-        columns={columns}
-        data={quotations}
-        isLoading={isLoading}
-        emptyMessage="No quotations generated yet"
-      />
+      <DataTable columns={columns} data={quotations} isLoading={isLoading} emptyMessage="No quotations recorded yet" />
 
-      {/* New Quotation Builder Modal */}
+      {/* Create New Quotation Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Create B2B Quotation Estimate"
-        subtitle="Add client information and selected products"
-        maxWidth="max-w-4xl"
+        title="Create New B2B Price Quotation"
+        subtitle="Prepare official commercial price estimate for clients"
+        maxWidth="max-w-3xl"
       >
         <form onSubmit={handleCreateQuotation} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Company / Customer Name"
+              label="Client / Company Name *"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="e.g. Acme Enterprises Ltd"
+              placeholder="e.g. Hotel Grand Inn / Rajesh Patel"
               required
             />
             <Input
               label="Phone Number"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="9876543210"
+              placeholder="10-digit mobile"
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Email Address"
+              type="email"
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder="corporate@acme.com"
+              placeholder="client@company.com"
             />
             <Input
-              label="Quotation Valid Until"
-              type="date"
-              value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
+              label="Quotation Validity (Days)"
+              type="number"
+              value={validDays}
+              onChange={(e) => setValidDays(e.target.value)}
+              placeholder="15"
             />
           </div>
 
-          <Input
-            label="Company Billing Address"
-            type="textarea"
-            value={customerAddress}
-            onChange={(e) => setCustomerAddress(e.target.value)}
-            placeholder="Complete address details..."
-          />
-
-          {/* Add Product Search for Quotation */}
-          <div className="space-y-2 pt-2 border-t border-slate-800">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-              Add Products to Quotation
+          {/* Product Search and Select */}
+          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-[#2D3138]">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
+              Add Products to Estimate
             </label>
-            <SearchBar
-              value={prodSearch}
-              onChange={setProdSearch}
-              onClear={() => setProdSearch('')}
-              placeholder="Search product by name or barcode to append..."
-            />
-
-            {prodResults.length > 0 && (
-              <div className="max-h-40 overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl p-2 space-y-1">
-                {prodResults.map((p) => (
-                  <div
-                    key={p.id}
-                    onClick={() => addProductToQuotation(p)}
-                    className="flex justify-between items-center p-2 rounded-lg hover:bg-slate-800 cursor-pointer text-xs"
-                  >
-                    <span>{p.name}</span>
-                    <span className="font-bold text-amber-400">{formatCurrency(p.selling_price)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="relative">
+              <input
+                type="text"
+                value={prodSearch}
+                onChange={(e) => setProdSearch(e.target.value)}
+                placeholder="Search catalog by product name or SKU..."
+                className="w-full p-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-xs text-slate-900 dark:text-[#F1F1F1]"
+              />
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white dark:bg-[#1E2126] border border-slate-200 dark:border-[#2D3138] rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                  {searchResults.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => addItemToQuotation(p)}
+                      className="p-2.5 hover:bg-slate-100 dark:hover:bg-[#121417] cursor-pointer text-xs flex justify-between border-b border-slate-100 dark:border-[#2D3138] last:border-0"
+                    >
+                      <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">{p.name}</span>
+                      <span className="text-[#C0392B] dark:text-[#E74C3C] font-extrabold">{formatCurrency(p.selling_price)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Quotation Items Table */}
-          <div className="border border-slate-800 rounded-xl overflow-hidden text-xs">
-            <table className="w-full text-left">
-              <thead className="bg-slate-900 text-slate-400">
-                <tr>
-                  <th className="p-3">Product Description</th>
-                  <th className="p-3 text-center">Unit Price</th>
-                  <th className="p-3 text-center">Qty</th>
-                  <th className="p-3 text-right">Total Amount</th>
-                  <th className="p-3 text-center">Remove</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {qtnItems.length === 0 ? (
+          {/* Items Table */}
+          {qtnItems.length > 0 && (
+            <div className="border border-slate-200 dark:border-[#2D3138] rounded-xl overflow-hidden text-xs">
+              <table className="w-full text-left">
+                <thead className="bg-[#FAFAF8] dark:bg-[#121417] border-b border-slate-200 dark:border-[#2D3138] text-slate-500 dark:text-[#9CA3AF]">
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-slate-500">
-                      No products added to this quotation yet
-                    </td>
+                    <th className="p-2.5">Product</th>
+                    <th className="p-2.5">Rate</th>
+                    <th className="p-2.5 text-center">Qty</th>
+                    <th className="p-2.5 text-right">Subtotal</th>
+                    <th className="p-2.5 text-center">Remove</th>
                   </tr>
-                ) : (
-                  qtnItems.map((item, idx) => (
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-[#2D3138] text-slate-900 dark:text-[#F1F1F1]">
+                  {qtnItems.map((item, idx) => (
                     <tr key={idx}>
-                      <td className="p-3 font-semibold text-slate-100">{item.product_name}</td>
-                      <td className="p-3 text-center">
-                        <input
-                          type="number"
-                          value={item.unit_price}
-                          onChange={(e) => {
-                            const copy = [...qtnItems];
-                            copy[idx].unit_price = parseFloat(e.target.value) || 0;
-                            setQtnItems(copy);
-                          }}
-                          className="w-20 p-1 bg-slate-900 border border-slate-700 rounded text-center"
-                        />
-                      </td>
-                      <td className="p-3 text-center">
+                      <td className="p-2.5 font-semibold">{item.product_name}</td>
+                      <td className="p-2.5">{formatCurrency(item.unit_price)}</td>
+                      <td className="p-2.5 text-center">
                         <input
                           type="number"
                           value={item.quantity}
                           onChange={(e) => {
-                            const copy = [...qtnItems];
-                            copy[idx].quantity = parseInt(e.target.value) || 1;
-                            setQtnItems(copy);
+                            const q = parseInt(e.target.value) || 1;
+                            setQtnItems((prev) =>
+                              prev.map((it, i) => (i === idx ? { ...it, quantity: q } : it))
+                            );
                           }}
-                          className="w-16 p-1 bg-slate-900 border border-slate-700 rounded text-center"
+                          className="w-14 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded"
                         />
                       </td>
-                      <td className="p-3 text-right font-bold text-amber-400">
+                      <td className="p-2.5 text-right font-extrabold text-[#C0392B] dark:text-[#E74C3C]">
                         {formatCurrency(item.unit_price * item.quantity)}
                       </td>
-                      <td className="p-3 text-center">
+                      <td className="p-2.5 text-center">
                         <button
                           type="button"
-                          onClick={() => setQtnItems(qtnItems.filter((_, i) => i !== idx))}
-                          className="text-rose-400 hover:text-rose-300"
+                          onClick={() => setQtnItems((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-rose-500 hover:bg-rose-500/10 p-1 rounded"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
 
-          <div className="flex justify-between items-center bg-slate-900/60 p-4 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-400">Estimated Total:</span>
-            <span className="text-xl font-extrabold text-amber-400">{formatCurrency(qtnTotals.grandTotal)}</span>
-          </div>
+              <div className="p-3 bg-[#FAFAF8] dark:bg-[#121417] text-right font-bold text-slate-900 dark:text-[#F1F1F1]">
+                Estimated Grand Total: <span className="text-[#C0392B] dark:text-[#E74C3C] text-sm">{formatCurrency(qtnTotals.grandTotal)}</span>
+              </div>
+            </div>
+          )}
 
-          <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
-            <Button onClick={() => setIsModalOpen(false)} variant="secondary">
+          <Input
+            label="Additional Terms / Notes"
+            type="textarea"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Payment terms, delivery schedule, guarantee details..."
+          />
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-[#2D3138]">
+            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" icon={Download}>
-              Generate & Export PDF
+            <Button type="submit" variant="primary">
+              Generate Commercial Quotation
             </Button>
           </div>
         </form>
       </Modal>
 
-      <Toast {...toast} onClose={() => setToast((t) => ({ ...t, isOpen: false }))} />
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={() => setToast({ ...toast, isOpen: false })}
+      />
     </div>
   );
 }

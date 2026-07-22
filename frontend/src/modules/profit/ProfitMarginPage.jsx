@@ -48,21 +48,21 @@ export default function ProfitMarginPage() {
       header: 'Product Description',
       render: (row) => (
         <div>
-          <p className="font-bold text-slate-100">{row.name}</p>
-          <p className="text-xs text-slate-400 font-mono">SKU: {row.sku} | Category: {row.category}</p>
+          <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.name}</p>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-mono">SKU: {row.sku} | Category: {row.category}</p>
         </div>
       )
     },
     {
       header: 'Purchase Price (Cost)',
       render: (row) => (
-        <span className="text-xs font-semibold text-slate-300">{formatCurrency(row.purchase_price)}</span>
+        <span className="text-xs font-semibold text-slate-700 dark:text-[#9CA3AF]">{formatCurrency(row.purchase_price)}</span>
       )
     },
     {
       header: 'Selling Price (Retail)',
       render: (row) => (
-        <span className="text-xs font-bold text-sky-400">{formatCurrency(row.selling_price)}</span>
+        <span className="text-xs font-bold text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(row.selling_price)}</span>
       )
     },
     {
@@ -70,7 +70,7 @@ export default function ProfitMarginPage() {
       render: (row) => {
         const profit = row.selling_price - row.purchase_price;
         return (
-          <span className={`font-extrabold text-xs flex items-center gap-1 ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+          <span className={`font-extrabold text-xs flex items-center gap-1 ${profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
             {profit >= 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
             {formatCurrency(profit)}
           </span>
@@ -93,13 +93,13 @@ export default function ProfitMarginPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-2 sm:p-4 space-y-6 max-w-7xl mx-auto">
       {/* Top Header */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-        <h2 className="text-xl font-extrabold text-slate-100 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-emerald-400" /> Profit Margin & Cost Analysis
+      <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
+        <h2 className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-[#C0392B] dark:text-[#E74C3C]" /> Profit Margin & Cost Analysis
         </h2>
-        <p className="text-xs text-slate-400 mt-0.5">Product cost vs selling price, gross profit margins, and inventory potential returns</p>
+        <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">Product cost vs selling price, gross profit margins, and inventory potential returns</p>
       </div>
 
       {/* Summary Cards */}
