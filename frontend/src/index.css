@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #FAFAF8;
+  --color-surface: #FFFFFF;
+  --color-steel: #4A5568;
+  --color-accent: #C0392B;
+  --color-accent-hover: #A93226;
+  --color-text: #1A1A1A;
+  --color-text-sec: #6B7280;
+  --color-border: #E5E7EB;
+}
+
+html.dark {
+  --color-bg: #121417;
+  --color-surface: #1E2126;
+  --color-steel: #94A3B8;
+  --color-accent: #E74C3C;
+  --color-accent-hover: #EC7063;
+  --color-text: #F1F1F1;
+  --color-text-sec: #9CA3AF;
+  --color-border: #2D3138;
+}
+
+@layer base {
+  html, body {
+    background-color: var(--color-bg) !important;
+    color: var(--color-text) !important;
+    font-family: 'Inter', sans-serif;
+    transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+html.dark ::-webkit-scrollbar-track {
+  background: #121417;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #2D3138;
+  border-radius: 9999px;
+}
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: #FAFAF8;
+}
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: #E5E7EB;
+  border-radius: 9999px;
+}
+
+/* Theme Glass Panels & Cards */
+.glass-panel {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+  border-style: solid;
+  border-width: 1px;
+}
+
+.glass-card {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  backdrop-filter: blur(4px);
+  border-style: solid;
+  border-width: 1px;
+}
+
+/* Accent Buttons */
+.btn-accent {
+  background-color: var(--color-accent);
+  color: #FFFFFF;
+  transition: all 0.2s ease-in-out;
+}
+.btn-accent:hover {
+  background-color: var(--color-accent-hover);
+  box-shadow: 0 4px 14px rgba(192, 57, 43, 0.3);
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .glass-panel, .glass-card {
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}

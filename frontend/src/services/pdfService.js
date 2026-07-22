@@ -1,0 +1,287 @@
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { formatCurrency } from './calcService';
+
+export function generateInvoicePDF(invoice, options = {}) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const primaryColor = [2, 132, 199]; // Sky 600
+
+  // 1. Company Header
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, 210, 28, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('PRABHURATNA METALS & APPLIANCES', 14, 16);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('TAX INVOICE', 196, 16, { align: 'right' });
+
+  // 2. Company Details & Invoice Metadata
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+
+  // Left: Store Address
+  doc.setFont('helvetica', 'bold');
+  doc.text('Prabhuratna Metals Pvt. Ltd.', 14, 36);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Main Market Road, Commercial Complex', 14, 41);
+  doc.text('GSTIN: 27AAAAA0000A1Z5 | Ph: +91 98765 43210', 14, 46);
+  doc.text('Email: support@prabhuratnametals.com', 14, 51);
+
+  // Right: Invoice Metadata
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Invoice No: ${invoice.invoice_number}`, 196, 36, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date: ${new Date(invoice.created_at || Date.now()).toLocaleDateString('en-IN')}`, 196, 41, { align: 'right' });
+  doc.text(`Payment Mode: ${invoice.payment_mode}`, 196, 46, { align: 'right' });
+
+  // 3. Customer Info Box
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(14, 57, 182, 22, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Billed To:', 18, 64);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Customer: ${invoice.customer_name || 'Walk-in Customer'}`, 18, 70);
+  doc.text(`Phone: ${invoice.customer_phone || 'N/A'}  |  Email: ${invoice.customer_email || 'N/A'}`, 18, 75);
+
+  // 4. Items Table with Perfect Column Alignments
+  const tableData = (invoice.items || []).map((item, idx) => [
+    idx + 1,
+    item.product_name,
+    item.barcode || 'N/A',
+    formatCurrency(item.unit_price),
+    item.quantity,
+    `${item.discount_percent || 0}%`,
+    `${item.gst_percent || 18}%`,
+    formatCurrency(item.total_price)
+  ]);
+
+  doc.autoTable({
+    startY: 85,
+    margin: { left: 14, right: 14 },
+    head: [['#', 'Product Description', 'Barcode', 'Rate', 'Qty', 'Disc %', 'GST %', 'Amount']],
+    body: tableData,
+    headStyles: {
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8.5
+    },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 'auto', halign: 'left' },
+      2: { cellWidth: 28, halign: 'center' },
+      3: { cellWidth: 26, halign: 'right' },
+      4: { cellWidth: 14, halign: 'center' },
+      5: { cellWidth: 16, halign: 'right' },
+      6: { cellWidth: 16, halign: 'right' },
+      7: { cellWidth: 28, halign: 'right' }
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      overflow: 'linebreak'
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] }
+  });
+
+  // 5. Totals Breakdown - Clean Right Alignment
+  const finalY = doc.lastAutoTable.finalY + 8;
+  const rightX = 196;
+  const labelX = 135;
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Subtotal:', labelX, finalY);
+  doc.text(formatCurrency(invoice.subtotal), rightX, finalY, { align: 'right' });
+
+  doc.text('Tax (GST Total):', labelX, finalY + 5);
+  doc.text(formatCurrency(invoice.tax_amount), rightX, finalY + 5, { align: 'right' });
+
+  if (invoice.discount_amount > 0) {
+    doc.text('Overall Bill Discount:', labelX, finalY + 10);
+    doc.text(`- ${formatCurrency(invoice.discount_amount)}`, rightX, finalY + 10, { align: 'right' });
+  }
+
+  const lineY = invoice.discount_amount > 0 ? finalY + 14 : finalY + 9;
+  doc.setLineWidth(0.4);
+  doc.setDrawColor(203, 213, 225);
+  doc.line(labelX, lineY, rightX, lineY);
+
+  const grandTotalY = lineY + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.text('Grand Total:', labelX, grandTotalY);
+  doc.text(formatCurrency(invoice.grand_total), rightX, grandTotalY, { align: 'right' });
+
+  // 6. Terms & Conditions & Signatures
+  const footerY = grandTotalY + 16;
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Terms & Conditions:', 14, footerY);
+  doc.setFont('helvetica', 'normal');
+  doc.text('1. Goods once sold will not be taken back or exchanged after 7 days.', 14, footerY + 4);
+  doc.text('2. All disputes are subject to local jurisdiction.', 14, footerY + 8);
+  doc.text('3. E. & O.E.', 14, footerY + 12);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('For Prabhuratna Metals & Appliances', 196, footerY + 4, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text('Authorized Signatory', 196, footerY + 16, { align: 'right' });
+
+  if (options.save !== false) {
+    doc.save(`${invoice.invoice_number}.pdf`);
+  }
+
+  return doc;
+}
+
+export function generateQuotationPDF(quotation, options = {}) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const accentColor = [217, 119, 6]; // Corporate Amber
+
+  // 1. Header
+  doc.setFillColor(...accentColor);
+  doc.rect(0, 0, 210, 28, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('PRABHURATNA METALS & APPLIANCES', 14, 16);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('COMMERCIAL QUOTATION', 196, 16, { align: 'right' });
+
+  // 2. Company Info & Quotation Details
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Prabhuratna Metals Pvt. Ltd.', 14, 36);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Commercial Sales Division | Ph: +91 98765 43210', 14, 41);
+  doc.text('Email: corporate@prabhuratnametals.com', 14, 46);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Quotation No: ${quotation.quotation_number}`, 196, 36, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date: ${new Date(quotation.created_at || Date.now()).toLocaleDateString('en-IN')}`, 196, 41, { align: 'right' });
+  if (quotation.valid_until) {
+    doc.text(`Valid Until: ${new Date(quotation.valid_until).toLocaleDateString('en-IN')}`, 196, 46, { align: 'right' });
+  }
+
+  // 3. Customer Information Box
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(254, 243, 199);
+  doc.roundedRect(14, 53, 182, 24, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Quotation Prepared For:', 18, 60);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Company / Client: ${quotation.customer_name}`, 18, 66);
+  doc.text(`Phone: ${quotation.customer_phone || 'N/A'}  |  Email: ${quotation.customer_email || 'N/A'}`, 18, 71);
+
+  // 4. Quotation Items Table
+  const tableData = (quotation.items || []).map((item, idx) => [
+    idx + 1,
+    item.product_name,
+    formatCurrency(item.unit_price),
+    item.quantity,
+    `${item.discount_percent || 0}%`,
+    `${item.gst_percent || 18}%`,
+    formatCurrency(item.total_price)
+  ]);
+
+  doc.autoTable({
+    startY: 83,
+    margin: { left: 14, right: 14 },
+    head: [['#', 'Product Description', 'Rate', 'Qty', 'Disc %', 'GST %', 'Total Amount']],
+    body: tableData,
+    headStyles: {
+      fillColor: accentColor,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8.5
+    },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 'auto', halign: 'left' },
+      2: { cellWidth: 28, halign: 'right' },
+      3: { cellWidth: 16, halign: 'center' },
+      4: { cellWidth: 18, halign: 'right' },
+      5: { cellWidth: 18, halign: 'right' },
+      6: { cellWidth: 32, halign: 'right' }
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      overflow: 'linebreak'
+    },
+    alternateRowStyles: { fillColor: [255, 251, 235] }
+  });
+
+  // 5. Totals Section
+  const finalY = doc.lastAutoTable.finalY + 8;
+  const rightX = 196;
+  const labelX = 135;
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Subtotal:', labelX, finalY);
+  doc.text(formatCurrency(quotation.subtotal), rightX, finalY, { align: 'right' });
+
+  doc.text('Estimated GST:', labelX, finalY + 5);
+  doc.text(formatCurrency(quotation.tax_amount), rightX, finalY + 5, { align: 'right' });
+
+  doc.setLineWidth(0.4);
+  doc.setDrawColor(203, 213, 225);
+  doc.line(labelX, finalY + 9, rightX, finalY + 9);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.text('Quotation Total:', labelX, finalY + 15);
+  doc.text(formatCurrency(quotation.grand_total), rightX, finalY + 15, { align: 'right' });
+
+  // 6. Notes, Terms & Signature Area
+  const footerY = finalY + 24;
+
+  if (quotation.notes) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Special Notes: ${quotation.notes}`, 14, footerY);
+  }
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Quotation Terms & Conditions:', 14, footerY + 8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('1. Prices are valid for 30 days from the date of quotation.', 14, footerY + 12);
+  doc.text('2. Delivery timelines will be confirmed upon purchase order receipt.', 14, footerY + 16);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('For Prabhuratna Metals & Appliances', 196, footerY + 8, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text('Authorized Commercial Representative', 196, footerY + 20, { align: 'right' });
+
+  if (options.save !== false) {
+    doc.save(`${quotation.quotation_number}.pdf`);
+  }
+
+  return doc;
+}

@@ -1,0 +1,94 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { ShoppingCart, LogOut, Clock, Menu, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+
+export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSidebarCollapse }) {
+  const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const [time, setTime] = useState(new Date().toLocaleTimeString());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between flex-nowrap transition-colors">
+      <div className="flex items-center gap-3">
+        {/* Mobile Hamburger */}
+        <button
+          onClick={toggleSidebar}
+          className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Desktop Collapse Toggle */}
+        <button
+          onClick={toggleSidebarCollapse}
+          title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="hidden lg:flex p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        >
+          {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+        </button>
+
+        <Link to="/app/dashboard" className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/20 font-bold text-white text-lg flex-shrink-0">
+            P
+          </div>
+          <div className="hidden sm:block">
+            <h1 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-none">PRABHURATNA</h1>
+            <p className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold tracking-wider uppercase">ERP & Billing POS</p>
+          </div>
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Real-time Clock */}
+        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 font-mono">
+          <Clock className="w-3.5 h-3.5 text-sky-500" />
+          <span>{time}</span>
+        </div>
+
+        {/* Light / Dark Mode Toggle */}
+        <button
+          onClick={toggleTheme}
+          title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
+          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700 text-amber-500 dark:text-amber-400 border border-slate-300 dark:border-slate-700/60 transition-colors"
+        >
+          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+
+        {/* Quick POS Billing CTA */}
+        <Link
+          to="/app/billing"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-xs shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap"
+        >
+          <ShoppingCart className="w-4 h-4" />
+          <span className="hidden sm:inline">Quick POS Billing</span>
+        </Link>
+
+        {/* User Profile & Logout */}
+        <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-800">
+          <div className="text-right hidden xl:block">
+            <p className="text-xs font-semibold text-slate-900 dark:text-slate-200">{user?.name || 'Admin User'}</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">{user?.role || 'Store Manager'}</p>
+          </div>
+          <button
+            onClick={() => {
+              logout();
+              navigate('/');
+            }}
+            title="Log Out"
+            className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 border border-rose-500/20 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
