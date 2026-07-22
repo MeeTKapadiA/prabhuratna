@@ -1,4 +1,4 @@
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function apiRequest(endpoint, method = 'GET', data = null, customHeaders = {}) {
   const token = localStorage.getItem('prabhuratna_token');
