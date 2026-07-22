@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const rawBaseUrl = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 export async function apiRequest(endpoint, method = 'GET', data = null, customHeaders = {}) {
   const token = localStorage.getItem('prabhuratna_token');
@@ -21,8 +22,11 @@ export async function apiRequest(endpoint, method = 'GET', data = null, customHe
     config.body = JSON.stringify(data);
   }
 
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const requestUrl = `${API_BASE_URL}${cleanEndpoint}`;
+
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const response = await fetch(requestUrl, config);
     
     // Check if response has content-type application/json
     const contentType = response.headers.get('content-type');
@@ -33,10 +37,10 @@ export async function apiRequest(endpoint, method = 'GET', data = null, customHe
     } else {
       // Non-JSON response (e.g., HTML 404 page from static host fallback)
       const text = await response.text();
-      console.error(`Non-JSON Response (${response.status}) from ${endpoint}:`, text.slice(0, 200));
+      console.error(`Non-JSON Response (${response.status}) from ${requestUrl}:`, text.slice(0, 200));
 
-      if (!response.ok) {
-        throw new Error(`API server endpoint unreachable (${response.status}). Please verify backend service configuration.`);
+      if (!response.ok || text.includes('<!DOCTYPE html>')) {
+        throw new Error(`API server endpoint unreachable (${response.status}). If backend is hosted separately, set VITE_API_URL in environment variables.`);
       }
       throw new Error('Server returned invalid non-JSON format.');
     }
@@ -52,7 +56,7 @@ export async function apiRequest(endpoint, method = 'GET', data = null, customHe
 
     return result;
   } catch (error) {
-    console.error(`API Error (${method} ${endpoint}):`, error);
+    console.error(`API Error (${method} ${requestUrl}):`, error);
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       throw new Error('Network Error: Cannot connect to backend server. Please check internet connection or server status.');
     }
