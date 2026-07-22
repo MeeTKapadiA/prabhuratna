@@ -15,8 +15,14 @@ const reportRoutes = require('./routes/reportRoutes');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middlewares
-app.use(cors());
+// Middlewares with production CORS support
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
+app.options('*', cors());
 app.use(express.json());
 
 // API Routes
@@ -29,7 +35,20 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
 
-// Health Check
+// Root & Health Check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    system: 'Prabhuratna Metals - Backend API Server',
+    apiUrl: '/api',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth/login'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
