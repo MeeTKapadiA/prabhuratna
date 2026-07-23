@@ -7,11 +7,11 @@ export default function Badge({
   className = ''
 }) {
   const variants = {
-    success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    danger: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-    warning: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    info: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-    neutral: 'bg-slate-800 text-slate-400 border-slate-700'
+    success: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+    danger: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20',
+    warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+    info: 'bg-[#C0392B]/10 text-[#C0392B] dark:bg-[#E74C3C]/10 dark:text-[#E74C3C] border-[#C0392B]/20 dark:border-[#E74C3C]/20',
+    neutral: 'bg-[#E5E7EB] text-[#6B7280] border-[#E5E7EB] dark:bg-[#2D3138] dark:text-[#9CA3AF] dark:border-[#2D3138]'
   };
 
   const sizes = {

@@ -167,6 +167,94 @@ function initDb() {
     );
   `);
 
+  // Suppliers Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS suppliers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      phone TEXT,
+      email TEXT,
+      address TEXT,
+      gst_number TEXT,
+      opening_balance REAL DEFAULT 0.0,
+      current_balance REAL DEFAULT 0.0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Purchases Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      purchase_number TEXT UNIQUE NOT NULL,
+      supplier_id INTEGER NOT NULL,
+      subtotal REAL NOT NULL,
+      tax_amount REAL DEFAULT 0.0,
+      grand_total REAL NOT NULL,
+      payment_status TEXT DEFAULT 'unpaid',
+      amount_paid REAL DEFAULT 0.0,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+    );
+  `);
+
+  // Purchase Items Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS purchase_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      purchase_id INTEGER NOT NULL,
+      product_id INTEGER,
+      product_name TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      purchase_price REAL NOT NULL,
+      total_price REAL NOT NULL,
+      FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    );
+  `);
+
+  // Returns Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS returns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      return_number TEXT UNIQUE NOT NULL,
+      invoice_id INTEGER,
+      customer_name TEXT,
+      customer_phone TEXT,
+      reason TEXT,
+      refund_mode TEXT NOT NULL DEFAULT 'cash',
+      refund_amount REAL NOT NULL DEFAULT 0.0,
+      status TEXT DEFAULT 'completed',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+    );
+  `);
+
+  // Return Items Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS return_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      return_id INTEGER NOT NULL,
+      product_id INTEGER,
+      product_name TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price REAL NOT NULL,
+      total_price REAL NOT NULL,
+      is_damaged INTEGER DEFAULT 0,
+      FOREIGN KEY (return_id) REFERENCES returns(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    );
+  `);
+
+  // Migrations wrapped in try/catch
+  try {
+    db.exec(`ALTER TABLE return_items ADD COLUMN is_damaged INTEGER DEFAULT 0`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE suppliers ADD COLUMN current_balance REAL DEFAULT 0.0`);
+  } catch (e) {}
+
   // Seed default admin & staff users
   const adminCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get('admin@prabhuratna.com', 'admin');
   if (!adminCheck) {

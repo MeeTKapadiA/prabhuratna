@@ -1,9 +1,13 @@
 import {
   LayoutDashboard,
   ShoppingCart,
+  Receipt,
   Package,
   FileText,
   Boxes,
+  Truck,
+  ShoppingBag,
+  RotateCcw,
   TrendingUp,
   BarChart3,
   Users
@@ -28,12 +32,44 @@ export const NAV_ITEMS = [
     priority: 2
   },
   {
+    id: 'invoices',
+    label: 'Customer Invoices',
+    path: '/app/invoices',
+    icon: Receipt,
+    module: 'invoices',
+    priority: 3
+  },
+  {
     id: 'products',
     label: 'Products',
     path: '/app/products',
     icon: Package,
     module: 'products',
-    priority: 3
+    priority: 4
+  },
+  {
+    id: 'suppliers',
+    label: 'Suppliers',
+    path: '/app/suppliers',
+    icon: Truck,
+    module: 'suppliers',
+    priority: 5
+  },
+  {
+    id: 'purchases',
+    label: 'Purchases',
+    path: '/app/purchases',
+    icon: ShoppingBag,
+    module: 'purchases',
+    priority: 6
+  },
+  {
+    id: 'returns',
+    label: 'Returns & Exchanges',
+    path: '/app/returns',
+    icon: RotateCcw,
+    module: 'returns',
+    priority: 7
   },
   {
     id: 'quotations',
@@ -41,7 +77,7 @@ export const NAV_ITEMS = [
     path: '/app/quotations',
     icon: FileText,
     module: 'billing',
-    priority: 4
+    priority: 8
   },
   {
     id: 'inventory',
@@ -49,7 +85,7 @@ export const NAV_ITEMS = [
     path: '/app/inventory',
     icon: Boxes,
     module: 'inventory',
-    priority: 5
+    priority: 9
   },
   {
     id: 'profit',
@@ -58,7 +94,7 @@ export const NAV_ITEMS = [
     icon: TrendingUp,
     module: 'reports',
     adminOnly: true,
-    priority: 6
+    priority: 10
   },
   {
     id: 'reports',
@@ -67,7 +103,7 @@ export const NAV_ITEMS = [
     icon: BarChart3,
     module: 'reports',
     adminOnly: true,
-    priority: 7
+    priority: 11
   },
   {
     id: 'users',
@@ -76,7 +112,7 @@ export const NAV_ITEMS = [
     icon: Users,
     module: 'users',
     adminOnly: true,
-    priority: 8
+    priority: 12
   }
 ];
 

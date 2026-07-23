@@ -8,7 +8,7 @@ import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
 import { calculateCartTotals, formatCurrency } from '../../services/calcService';
-import { generateQuotationPDF } from '../../services/pdfService';
+import { generateQuotationPDF, printQuotationPDF } from '../../services/pdfService';
 import { FileText, Plus, Download, Printer, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function QuotationsPage() {
@@ -145,6 +145,17 @@ export default function QuotationsPage() {
     }
   };
 
+  const handlePrintPDF = async (id) => {
+    try {
+      const res = await apiRequest(`/quotations/${id}`);
+      if (res.success && res.quotation) {
+        printQuotationPDF(res.quotation);
+      }
+    } catch (err) {
+      setToast({ isOpen: true, type: 'error', message: 'Failed to print quotation' });
+    }
+  };
+
   const handleStatusChange = async (id, status) => {
     try {
       await apiRequest(`/quotations/${id}/status`, 'PUT', { status });
@@ -204,7 +215,7 @@ export default function QuotationsPage() {
             <Download className="w-4 h-4" />
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => handlePrintPDF(row.id)}
             title="Print Quotation"
             className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-sky-600 dark:text-sky-400"
           >

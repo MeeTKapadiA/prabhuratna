@@ -2,6 +2,8 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { formatCurrency } from './calcService';
 
+const BRAND_COLOR = [192, 57, 43]; // #C0392B (Prabhuratna Red/Maroon)
+
 export function generateInvoicePDF(invoice, options = {}) {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -9,16 +11,14 @@ export function generateInvoicePDF(invoice, options = {}) {
     format: 'a4'
   });
 
-  const primaryColor = [2, 132, 199]; // Sky 600
-
-  // 1. Company Header
-  doc.setFillColor(...primaryColor);
+  // 1. Company Header Banner
+  doc.setFillColor(...BRAND_COLOR);
   doc.rect(0, 0, 210, 28, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('PRABHURATNA METALS & APPLIANCES', 14, 16);
+  doc.text('PRABHURATNA METALS', 14, 16);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -32,16 +32,16 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setFont('helvetica', 'bold');
   doc.text('Prabhuratna Metals Pvt. Ltd.', 14, 36);
   doc.setFont('helvetica', 'normal');
-  doc.text('Main Market Road, Commercial Complex', 14, 41);
-  doc.text('GSTIN: 27AAAAA0000A1Z5 | Ph: +91 98765 43210', 14, 46);
-  doc.text('Email: support@prabhuratnametals.com', 14, 51);
+  doc.text('Main Market Road, Commercial Complex, Ahmedabad, GJ', 14, 41);
+  doc.text('GSTIN: 24ABCDE1234F1Z5 | Ph: +91 98765 43210', 14, 46);
+  doc.text('Email: info@prabhuratna.com', 14, 51);
 
   // Right: Invoice Metadata
   doc.setFont('helvetica', 'bold');
   doc.text(`Invoice No: ${invoice.invoice_number}`, 196, 36, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text(`Date: ${new Date(invoice.created_at || Date.now()).toLocaleDateString('en-IN')}`, 196, 41, { align: 'right' });
-  doc.text(`Payment Mode: ${invoice.payment_mode}`, 196, 46, { align: 'right' });
+  doc.text(`Payment Mode: ${invoice.payment_mode || 'Cash'}`, 196, 46, { align: 'right' });
 
   // 3. Customer Info Box
   doc.setDrawColor(226, 232, 240);
@@ -54,7 +54,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text(`Customer: ${invoice.customer_name || 'Walk-in Customer'}`, 18, 70);
   doc.text(`Phone: ${invoice.customer_phone || 'N/A'}  |  Email: ${invoice.customer_email || 'N/A'}`, 18, 75);
 
-  // 4. Items Table with Perfect Column Alignments
+  // 4. Items Table
   const tableData = (invoice.items || []).map((item, idx) => [
     idx + 1,
     item.product_name,
@@ -72,7 +72,7 @@ export function generateInvoicePDF(invoice, options = {}) {
     head: [['#', 'Product Description', 'Barcode', 'Rate', 'Qty', 'Disc %', 'GST %', 'Amount']],
     body: tableData,
     headStyles: {
-      fillColor: primaryColor,
+      fillColor: BRAND_COLOR,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 8.5
@@ -95,7 +95,7 @@ export function generateInvoicePDF(invoice, options = {}) {
     alternateRowStyles: { fillColor: [248, 250, 252] }
   });
 
-  // 5. Totals Breakdown - Clean Right Alignment
+  // 5. Totals Breakdown
   const finalY = doc.lastAutoTable.finalY + 8;
   const rightX = 196;
   const labelX = 135;
@@ -131,11 +131,11 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text('Terms & Conditions:', 14, footerY);
   doc.setFont('helvetica', 'normal');
   doc.text('1. Goods once sold will not be taken back or exchanged after 7 days.', 14, footerY + 4);
-  doc.text('2. All disputes are subject to local jurisdiction.', 14, footerY + 8);
-  doc.text('3. E. & O.E.', 14, footerY + 12);
+  doc.text('2. All disputes are subject to Ahmedabad jurisdiction.', 14, footerY + 8);
+  doc.text('3. Computer Generated Tax Invoice.', 14, footerY + 12);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('For Prabhuratna Metals & Appliances', 196, footerY + 4, { align: 'right' });
+  doc.text('For Prabhuratna Metals', 196, footerY + 4, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text('Authorized Signatory', 196, footerY + 16, { align: 'right' });
 
@@ -146,6 +146,15 @@ export function generateInvoicePDF(invoice, options = {}) {
   return doc;
 }
 
+export function printInvoicePDF(invoice) {
+  const doc = generateInvoicePDF(invoice, { save: false });
+  const blobUrl = doc.output('bloburl');
+  const printWindow = window.open(blobUrl, '_blank');
+  if (printWindow) {
+    printWindow.focus();
+  }
+}
+
 export function generateQuotationPDF(quotation, options = {}) {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -153,16 +162,14 @@ export function generateQuotationPDF(quotation, options = {}) {
     format: 'a4'
   });
 
-  const accentColor = [217, 119, 6]; // Corporate Amber
-
   // 1. Header
-  doc.setFillColor(...accentColor);
+  doc.setFillColor(...BRAND_COLOR);
   doc.rect(0, 0, 210, 28, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('PRABHURATNA METALS & APPLIANCES', 14, 16);
+  doc.text('PRABHURATNA METALS', 14, 16);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -176,7 +183,7 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text('Prabhuratna Metals Pvt. Ltd.', 14, 36);
   doc.setFont('helvetica', 'normal');
   doc.text('Commercial Sales Division | Ph: +91 98765 43210', 14, 41);
-  doc.text('Email: corporate@prabhuratnametals.com', 14, 46);
+  doc.text('Email: info@prabhuratna.com', 14, 46);
 
   doc.setFont('helvetica', 'bold');
   doc.text(`Quotation No: ${quotation.quotation_number}`, 196, 36, { align: 'right' });
@@ -188,7 +195,7 @@ export function generateQuotationPDF(quotation, options = {}) {
 
   // 3. Customer Information Box
   doc.setDrawColor(226, 232, 240);
-  doc.setFillColor(254, 243, 199);
+  doc.setFillColor(248, 250, 252);
   doc.roundedRect(14, 53, 182, 24, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
@@ -214,7 +221,7 @@ export function generateQuotationPDF(quotation, options = {}) {
     head: [['#', 'Product Description', 'Rate', 'Qty', 'Disc %', 'GST %', 'Total Amount']],
     body: tableData,
     headStyles: {
-      fillColor: accentColor,
+      fillColor: BRAND_COLOR,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 8.5
@@ -233,7 +240,7 @@ export function generateQuotationPDF(quotation, options = {}) {
       cellPadding: 3,
       overflow: 'linebreak'
     },
-    alternateRowStyles: { fillColor: [255, 251, 235] }
+    alternateRowStyles: { fillColor: [248, 250, 252] }
   });
 
   // 5. Totals Section
@@ -275,7 +282,7 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text('2. Delivery timelines will be confirmed upon purchase order receipt.', 14, footerY + 16);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('For Prabhuratna Metals & Appliances', 196, footerY + 8, { align: 'right' });
+  doc.text('For Prabhuratna Metals', 196, footerY + 8, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text('Authorized Commercial Representative', 196, footerY + 20, { align: 'right' });
 
@@ -284,4 +291,13 @@ export function generateQuotationPDF(quotation, options = {}) {
   }
 
   return doc;
+}
+
+export function printQuotationPDF(quotation) {
+  const doc = generateQuotationPDF(quotation, { save: false });
+  const blobUrl = doc.output('bloburl');
+  const printWindow = window.open(blobUrl, '_blank');
+  if (printWindow) {
+    printWindow.focus();
+  }
 }

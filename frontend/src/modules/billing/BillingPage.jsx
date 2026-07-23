@@ -8,7 +8,7 @@ import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
 import { setupBarcodeScanner } from '../../services/barcodeScanner';
 import { calculateCartTotals, formatCurrency } from '../../services/calcService';
-import { generateInvoicePDF } from '../../services/pdfService';
+import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
 import {
   ScanBarcode,
   Search,
@@ -195,20 +195,35 @@ export default function BillingPage() {
         customer_phone: customerPhone,
         customer_email: customerEmail,
         payment_mode: paymentMode,
-        overall_discount: parseFloat(overallDiscount) || 0,
+        subtotal: cartTotals.subtotal,
+        tax_amount: cartTotals.taxAmount,
+        discount_amount: cartTotals.totalDiscount,
+        grand_total: cartTotals.grandTotal,
         notes,
-        items: cartItems.map((item) => ({
-          product_id: item.product_id,
-          product_name: item.product_name,
-          barcode: item.barcode,
-          unit_price: item.unit_price,
-          quantity: item.quantity,
-          discount_percent: item.discount_percent,
-          gst_percent: item.gst_percent
-        }))
+        items: cartItems.map((item) => {
+          const uPrice = parseFloat(item.unit_price) || 0;
+          const qty = parseInt(item.quantity) || 1;
+          const disc = parseFloat(item.discount_percent) || 0;
+          const gst = parseFloat(item.gst_percent) || 0;
+          const base = uPrice * qty;
+          const itemDisc = base * (disc / 100);
+          const afterDisc = base - itemDisc;
+          const itemGst = afterDisc * (gst / 100);
+          const totalP = Math.round((afterDisc + itemGst) * 100) / 100;
+          return {
+            product_id: item.product_id || item.id || null,
+            product_name: item.product_name || item.name,
+            barcode: item.barcode || '',
+            unit_price: uPrice,
+            quantity: qty,
+            discount_percent: disc,
+            gst_percent: gst,
+            total_price: totalP
+          };
+        })
       };
 
-      const res = await apiRequest('/invoices', 'POST', payload);
+      const res = await apiRequest('/billing/invoices', 'POST', payload);
       if (res.success) {
         setCompletedInvoice(res.invoice);
         setIsInvoiceModalOpen(true);
@@ -566,7 +581,7 @@ export default function BillingPage() {
         footer={
           <div className="flex flex-wrap gap-2 justify-end">
             <Button
-              onClick={() => window.print()}
+              onClick={() => printInvoicePDF(completedInvoice)}
               variant="secondary"
               icon={Printer}
             >

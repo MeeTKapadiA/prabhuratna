@@ -11,6 +11,10 @@ const quotationRoutes = require('./routes/quotationRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const supplierRoutes = require('./routes/supplierRoutes');
+const purchaseRoutes = require('./routes/purchaseRoutes');
+const returnRoutes = require('./routes/returnRoutes');
+const backupRoutes = require('./routes/backupRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -30,10 +34,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/invoices', billingRoutes);
 app.use('/api/quotations', quotationRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/returns', returnRoutes);
+app.use('/api/backup', backupRoutes);
 
 // Root & Health Check
 app.get('/', (req, res) => {

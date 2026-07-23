@@ -6,10 +6,10 @@ exports.createInvoice = (req, res) => {
       customer_name,
       customer_phone,
       customer_email,
-      subtotal,
-      tax_amount,
-      discount_amount,
-      grand_total,
+      subtotal: rawSubtotal,
+      tax_amount: rawTaxAmount,
+      discount_amount: rawDiscountAmount,
+      grand_total: rawGrandTotal,
       payment_mode,
       notes,
       items
@@ -22,6 +22,40 @@ exports.createInvoice = (req, res) => {
     if (!payment_mode) {
       return res.status(400).json({ success: false, message: 'Payment mode is required' });
     }
+
+    // Auto-calculate totals if not passed or zero
+    let calcSubtotal = 0;
+    let calcTax = 0;
+    let calcDiscount = parseFloat(rawDiscountAmount) || 0;
+
+    const processedItems = items.map((item) => {
+      const uPrice = parseFloat(item.unit_price) || 0;
+      const qty = parseInt(item.quantity) || 1;
+      const disc = parseFloat(item.discount_percent) || 0;
+      const gst = parseFloat(item.gst_percent) || 0;
+
+      const base = uPrice * qty;
+      const itemDisc = base * (disc / 100);
+      const afterDisc = base - itemDisc;
+      const itemGst = afterDisc * (gst / 100);
+      const itemTotal = parseFloat(item.total_price) || Math.round((afterDisc + itemGst) * 100) / 100;
+
+      calcSubtotal += afterDisc;
+      calcTax += itemGst;
+
+      return {
+        ...item,
+        unit_price: uPrice,
+        quantity: qty,
+        discount_percent: disc,
+        gst_percent: gst,
+        total_price: itemTotal
+      };
+    });
+
+    const finalSubtotal = parseFloat(rawSubtotal) > 0 ? parseFloat(rawSubtotal) : Math.round(calcSubtotal * 100) / 100;
+    const finalTax = parseFloat(rawTaxAmount) > 0 ? parseFloat(rawTaxAmount) : Math.round(calcTax * 100) / 100;
+    const finalGrandTotal = parseFloat(rawGrandTotal) > 0 ? parseFloat(rawGrandTotal) : Math.round((finalSubtotal + finalTax - calcDiscount) * 100) / 100;
 
     // Generate unique invoice number
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -43,10 +77,10 @@ exports.createInvoice = (req, res) => {
         customer_name || 'Walk-in Customer',
         customer_phone || '',
         customer_email || '',
-        parseFloat(subtotal) || 0,
-        parseFloat(tax_amount) || 0,
-        parseFloat(discount_amount) || 0,
-        parseFloat(grand_total) || 0,
+        finalSubtotal,
+        finalTax,
+        calcDiscount,
+        finalGrandTotal,
         payment_mode,
         notes || ''
       );
@@ -70,27 +104,27 @@ exports.createInvoice = (req, res) => {
         VALUES (?, 'SALE', ?, ?, ?, ?)
       `);
 
-      for (const item of items) {
+      for (const item of processedItems) {
         itemStmt.run(
           invoiceId,
           item.product_id || null,
           item.product_name,
           item.barcode || '',
-          parseFloat(item.unit_price) || 0,
-          parseInt(item.quantity) || 1,
-          parseFloat(item.discount_percent) || 0,
-          parseFloat(item.gst_percent) || 0,
-          parseFloat(item.total_price) || 0
+          item.unit_price,
+          item.quantity,
+          item.discount_percent,
+          item.gst_percent,
+          item.total_price
         );
 
         if (item.product_id) {
           const prod = db.prepare('SELECT stock_quantity FROM products WHERE id = ?').get(item.product_id);
           if (prod) {
             const prevStock = prod.stock_quantity;
-            const newStock = prevStock - parseInt(item.quantity);
+            const newStock = prevStock - item.quantity;
             
-            updateStockStmt.run(parseInt(item.quantity), item.product_id);
-            logStmt.run(item.product_id, -parseInt(item.quantity), prevStock, newStock, `Sold in invoice ${invoiceNumber}`);
+            updateStockStmt.run(item.quantity, item.product_id);
+            logStmt.run(item.product_id, -item.quantity, prevStock, newStock, `Sold in invoice ${invoiceNumber}`);
           }
         }
       }

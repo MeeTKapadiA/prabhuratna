@@ -27,10 +27,10 @@ export default function Toast({
   };
 
   const borders = {
-    success: 'border-emerald-500/30 bg-emerald-950/40 text-emerald-100',
-    error: 'border-rose-500/30 bg-rose-950/40 text-rose-100',
-    warning: 'border-amber-500/30 bg-amber-950/40 text-amber-100',
-    info: 'border-sky-500/30 bg-sky-950/40 text-sky-100'
+    success: 'border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100',
+    error: 'border-rose-500/30 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-100',
+    warning: 'border-amber-500/30 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100',
+    info: 'border-[#C0392B]/30 bg-red-50 dark:bg-[#E74C3C]/10 text-[#1A1A1A] dark:text-[#F1F1F1]'
   };
 
   return (

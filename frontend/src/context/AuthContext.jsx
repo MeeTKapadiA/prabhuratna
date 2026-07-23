@@ -21,8 +21,11 @@ export function AuthProvider({ children }) {
     // Staff permissions mapping
     if (role === 'staff') {
       if (module === 'products') return ['view', 'add', 'edit'].includes(action);
-      if (module === 'billing') return ['view', 'create', 'print', 'download'].includes(action);
+      if (module === 'billing' || module === 'invoices') return ['view', 'create', 'print', 'download'].includes(action);
       if (module === 'inventory') return ['view', 'update'].includes(action);
+      if (module === 'suppliers') return ['view', 'create', 'edit'].includes(action);
+      if (module === 'purchases') return ['view', 'create', 'edit'].includes(action);
+      if (module === 'returns') return ['view', 'create'].includes(action);
       // Restricted for Staff: reports, users, settings, deletion
       return false;
     }

@@ -9,9 +9,13 @@ import { getDefaultRouteForUser } from './config/navConfig';
 import LandingPage from './modules/landing/LandingPage';
 import DashboardPage from './modules/dashboard/DashboardPage';
 import BillingPage from './modules/billing/BillingPage';
+import InvoicesPage from './modules/invoices/InvoicesPage';
 import ProductsPage from './modules/products/ProductsPage';
 import QuotationsPage from './modules/quotations/QuotationsPage';
 import InventoryPage from './modules/inventory/InventoryPage';
+import SuppliersPage from './modules/suppliers/SuppliersPage';
+import PurchasesPage from './modules/purchases/PurchasesPage';
+import ReturnsPage from './modules/returns/ReturnsPage';
 import ProfitMarginPage from './modules/profit/ProfitMarginPage';
 import ReportsPage from './modules/reports/ReportsPage';
 import UsersPage from './modules/users/UsersPage';
@@ -78,7 +82,11 @@ export default function App() {
               <Route index element={<IndexRedirect />} />
               <Route path="dashboard" element={<RequireAdmin><DashboardPage /></RequireAdmin>} />
               <Route path="billing" element={<BillingPage />} />
+              <Route path="invoices" element={<InvoicesPage />} />
               <Route path="products" element={<ProductsPage />} />
+              <Route path="suppliers" element={<SuppliersPage />} />
+              <Route path="purchases" element={<PurchasesPage />} />
+              <Route path="returns" element={<ReturnsPage />} />
               <Route path="quotations" element={<QuotationsPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               
