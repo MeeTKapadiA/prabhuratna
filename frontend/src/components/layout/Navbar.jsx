@@ -16,7 +16,7 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
   }, []);
 
   return (
-    <header className="h-16 border-b border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between flex-nowrap transition-colors shadow-xs">
+    <header className="h-16 border-b border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] sticky top-0 z-50 px-4 sm:px-6 flex items-center justify-between flex-nowrap transition-colors shadow-xs">
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger */}
         <button
