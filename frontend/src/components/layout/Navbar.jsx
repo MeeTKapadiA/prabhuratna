@@ -36,9 +36,14 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
         </button>
 
         <Link to="/app/dashboard" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#C0392B] dark:bg-[#E74C3C] flex items-center justify-center font-bold text-white text-lg flex-shrink-0 shadow-sm">
-            P
-          </div>
+          <img
+            src="/logo.png"
+            alt="Prabhuratna Metals Logo"
+            className="w-9 h-9 object-contain rounded-xl bg-white p-0.5 border border-slate-200 dark:border-[#2D3138] flex-shrink-0 shadow-sm"
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
           <div className="hidden sm:block">
             <h1 className="text-base font-bold text-slate-900 dark:text-[#F1F1F1] leading-none">PRABHURATNA</h1>
             <p className="text-[10px] text-[#C0392B] dark:text-[#E74C3C] font-bold tracking-wider uppercase">ERP & Billing POS</p>
