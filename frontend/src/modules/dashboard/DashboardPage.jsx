@@ -14,7 +14,7 @@ import {
   PieChart,
   ShoppingBag,
   ArrowUpRight,
-  ArrowDownRight
+  RefreshCw
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,32 +30,64 @@ export default function DashboardPage() {
   const { isDark } = useTheme();
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadStats = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await apiRequest('/dashboard/stats');
+      if (res && res.success) {
+        setStats(res);
+      } else {
+        setError(res?.message || 'Failed to load dashboard statistics');
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard:', err);
+      setError(err.message || 'Network error connecting to backend server');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadStats() {
-      try {
-        const res = await apiRequest('/dashboard/stats');
-        if (res.success) {
-          setStats(res);
-        }
-      } catch (err) {
-        console.error('Failed to load dashboard:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
     loadStats();
   }, []);
 
-  if (isLoading || !stats) {
+  if (isLoading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto flex items-center justify-center min-h-[60vh]">
+      <div className="p-6 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#C0392B] dark:border-[#E74C3C]"></div>
+        <p className="text-xs font-semibold text-slate-500 dark:text-[#9CA3AF]">Loading dashboard statistics...</p>
       </div>
     );
   }
 
-  const { sales, inventory, profit, insights, chartData } = stats;
+  if (error || !stats) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
+        <div className="p-4 rounded-full bg-rose-500/10 text-rose-500">
+          <AlertTriangle className="w-8 h-8" />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-[#F1F1F1]">Unable to Load Dashboard</h3>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1 max-w-md">{error || 'An error occurred while fetching system metrics.'}</p>
+        </div>
+        <button
+          onClick={loadStats}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#C0392B] dark:bg-[#E74C3C] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#a93226] transition-all cursor-pointer"
+        >
+          <RefreshCw className="w-4 h-4" /> Retry Loading
+        </button>
+      </div>
+    );
+  }
+
+  const sales = stats.sales || { today: { total: 0, count: 0 }, weekly: { total: 0, count: 0 }, monthly: { total: 0, count: 0 } };
+  const inventory = stats.inventory || { totalProducts: 0, lowStockProducts: 0, outOfStockProducts: 0, lowStockList: [], outOfStockList: [] };
+  const profit = stats.profit || { grossMarginPercent: 0, grossProfit: 0, totalRevenue: 0, totalCost: 0 };
+  const insights = stats.insights || { topProfitable: [], lowestProfitable: [] };
+  const chartData = stats.chartData || [];
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
@@ -77,32 +109,32 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Today's Sales"
-          value={formatCurrency(sales.today.total)}
-          subtitle={`${sales.today.count} Transactions Today`}
+          value={formatCurrency(sales.today?.total || 0)}
+          subtitle={`${sales.today?.count || 0} Transactions Today`}
           icon={ShoppingBag}
           color="sky"
         />
 
         <StatCard
           title="Weekly Revenue"
-          value={formatCurrency(sales.weekly.total)}
-          subtitle={`Last 7 Days Sales`}
+          value={formatCurrency(sales.weekly?.total || 0)}
+          subtitle="Last 7 Days Sales"
           icon={DollarSign}
           color="emerald"
         />
 
         <StatCard
           title="Monthly Revenue"
-          value={formatCurrency(sales.monthly.total)}
-          subtitle={`Last 30 Days Sales`}
+          value={formatCurrency(sales.monthly?.total || 0)}
+          subtitle="Last 30 Days Sales"
           icon={TrendingUp}
           color="purple"
         />
 
         <StatCard
           title="Gross Profit Margin"
-          value={`${profit.grossMarginPercent}%`}
-          subtitle={`Gross Profit: ${formatCurrency(profit.grossProfit)}`}
+          value={`${profit.grossMarginPercent || 0}%`}
+          subtitle={`Gross Profit: ${formatCurrency(profit.grossProfit || 0)}`}
           icon={PieChart}
           color="amber"
         />
@@ -112,7 +144,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           title="Total Products in Catalog"
-          value={inventory.totalProducts}
+          value={inventory.totalProducts || 0}
           subtitle="Active SKUs"
           icon={Boxes}
           color="sky"
@@ -120,7 +152,7 @@ export default function DashboardPage() {
 
         <StatCard
           title="Low Stock Alerts"
-          value={inventory.lowStockProducts}
+          value={inventory.lowStockProducts || 0}
           subtitle="Below minimum threshold"
           icon={AlertTriangle}
           color="amber"
@@ -128,7 +160,7 @@ export default function DashboardPage() {
 
         <StatCard
           title="Out of Stock Items"
-          value={inventory.outOfStockProducts}
+          value={inventory.outOfStockProducts || 0}
           subtitle="Immediate reorder required"
           icon={PackageX}
           color="rose"
@@ -279,7 +311,7 @@ export default function DashboardPage() {
                   <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 justify-end">
                     <ArrowUpRight className="w-3.5 h-3.5" /> +{formatCurrency(p.unit_profit)}
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-[#9CA3AF]">{p.profit_margin_percent.toFixed(1)}% margin</span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-[#9CA3AF]">{(Number(p.profit_margin_percent) || 0).toFixed(1)}% margin</span>
                 </div>
               </div>
             ))}
