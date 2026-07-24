@@ -1,8 +1,21 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { formatCurrency } from './calcService';
 
 const BRAND_COLOR = [192, 57, 43]; // #C0392B (Prabhuratna Red/Maroon)
+
+/**
+ * PDF-specific currency formatter using 'Rs. ' prefix instead of '₹'
+ * to avoid broken character glyphs in jsPDF default Helvetica font.
+ */
+export function formatCurrencyPDF(amount = 0, showDecimals = false) {
+  const num = parseFloat(amount) || 0;
+  const formatted = new Intl.NumberFormat('en-IN', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: num % 1 === 0 ? 0 : 2
+  }).format(num);
+
+  return `Rs. ${formatted}`;
+}
 
 export function generateInvoicePDF(invoice, options = {}) {
   const doc = new jsPDF({
@@ -36,12 +49,20 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text('GSTIN: 24ABCDE1234F1Z5 | Ph: +91 98765 43210', 14, 46);
   doc.text('Email: info@prabhuratna.com', 14, 51);
 
-  // Right: Invoice Metadata
+  // Right: Invoice Metadata (Two-Column Alignment)
+  const metaLabelX = 150;
+  const metaValueX = 196;
+
   doc.setFont('helvetica', 'bold');
-  doc.text(`Invoice No: ${invoice.invoice_number}`, 196, 36, { align: 'right' });
+  doc.text('Invoice No:', metaLabelX, 36);
+  doc.text(invoice.invoice_number || '', metaValueX, 36, { align: 'right' });
+
   doc.setFont('helvetica', 'normal');
-  doc.text(`Date: ${new Date(invoice.created_at || Date.now()).toLocaleDateString('en-IN')}`, 196, 41, { align: 'right' });
-  doc.text(`Payment Mode: ${invoice.payment_mode || 'Cash'}`, 196, 46, { align: 'right' });
+  doc.text('Date:', metaLabelX, 41);
+  doc.text(new Date(invoice.created_at || Date.now()).toLocaleDateString('en-IN'), metaValueX, 41, { align: 'right' });
+
+  doc.text('Payment Mode:', metaLabelX, 46);
+  doc.text(invoice.payment_mode || 'Cash', metaValueX, 46, { align: 'right' });
 
   // 3. Customer Info Box
   doc.setDrawColor(226, 232, 240);
@@ -55,16 +76,21 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text(`Phone: ${invoice.customer_phone || 'N/A'}  |  Email: ${invoice.customer_email || 'N/A'}`, 18, 75);
 
   // 4. Items Table
-  const tableData = (invoice.items || []).map((item, idx) => [
-    idx + 1,
-    item.product_name,
-    item.barcode || 'N/A',
-    formatCurrency(item.unit_price),
-    item.quantity,
-    `${item.discount_percent || 0}%`,
-    `${item.gst_percent || 18}%`,
-    formatCurrency(item.total_price)
-  ]);
+  const tableData = (invoice.items || []).map((item, idx) => {
+    const discVal = parseFloat(item.discount_percent);
+    const gstVal = parseFloat(item.gst_percent);
+
+    return [
+      idx + 1,
+      item.product_name || 'N/A',
+      item.barcode || '–',
+      formatCurrencyPDF(item.unit_price),
+      item.quantity || 1,
+      discVal > 0 ? `${discVal}%` : '–',
+      gstVal > 0 ? `${gstVal}%` : '–',
+      formatCurrencyPDF(item.total_price)
+    ];
+  });
 
   doc.autoTable({
     startY: 85,
@@ -103,17 +129,17 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.text('Subtotal:', labelX, finalY);
-  doc.text(formatCurrency(invoice.subtotal), rightX, finalY, { align: 'right' });
+  doc.text(formatCurrencyPDF(invoice.subtotal), rightX, finalY, { align: 'right' });
 
   doc.text('Tax (GST Total):', labelX, finalY + 5);
-  doc.text(formatCurrency(invoice.tax_amount), rightX, finalY + 5, { align: 'right' });
+  doc.text(formatCurrencyPDF(invoice.tax_amount), rightX, finalY + 5, { align: 'right' });
 
-  if (invoice.discount_amount > 0) {
+  if (parseFloat(invoice.discount_amount) > 0) {
     doc.text('Overall Bill Discount:', labelX, finalY + 10);
-    doc.text(`- ${formatCurrency(invoice.discount_amount)}`, rightX, finalY + 10, { align: 'right' });
+    doc.text(`- ${formatCurrencyPDF(invoice.discount_amount)}`, rightX, finalY + 10, { align: 'right' });
   }
 
-  const lineY = invoice.discount_amount > 0 ? finalY + 14 : finalY + 9;
+  const lineY = parseFloat(invoice.discount_amount) > 0 ? finalY + 14 : finalY + 9;
   doc.setLineWidth(0.4);
   doc.setDrawColor(203, 213, 225);
   doc.line(labelX, lineY, rightX, lineY);
@@ -122,7 +148,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.text('Grand Total:', labelX, grandTotalY);
-  doc.text(formatCurrency(invoice.grand_total), rightX, grandTotalY, { align: 'right' });
+  doc.text(formatCurrencyPDF(invoice.grand_total), rightX, grandTotalY, { align: 'right' });
 
   // 6. Terms & Conditions & Signatures
   const footerY = grandTotalY + 16;
@@ -185,12 +211,20 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text('Commercial Sales Division | Ph: +91 98765 43210', 14, 41);
   doc.text('Email: info@prabhuratna.com', 14, 46);
 
+  // Right: Quotation Metadata (Two-Column Alignment)
+  const metaLabelX = 150;
+  const metaValueX = 196;
+
   doc.setFont('helvetica', 'bold');
-  doc.text(`Quotation No: ${quotation.quotation_number}`, 196, 36, { align: 'right' });
+  doc.text('Quotation No:', metaLabelX, 36);
+  doc.text(quotation.quotation_number || '', metaValueX, 36, { align: 'right' });
+
   doc.setFont('helvetica', 'normal');
-  doc.text(`Date: ${new Date(quotation.created_at || Date.now()).toLocaleDateString('en-IN')}`, 196, 41, { align: 'right' });
+  doc.text('Date:', metaLabelX, 41);
+  doc.text(new Date(quotation.created_at || Date.now()).toLocaleDateString('en-IN'), metaValueX, 41, { align: 'right' });
   if (quotation.valid_until) {
-    doc.text(`Valid Until: ${new Date(quotation.valid_until).toLocaleDateString('en-IN')}`, 196, 46, { align: 'right' });
+    doc.text('Valid Until:', metaLabelX, 46);
+    doc.text(new Date(quotation.valid_until).toLocaleDateString('en-IN'), metaValueX, 46, { align: 'right' });
   }
 
   // 3. Customer Information Box
@@ -205,15 +239,20 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text(`Phone: ${quotation.customer_phone || 'N/A'}  |  Email: ${quotation.customer_email || 'N/A'}`, 18, 71);
 
   // 4. Quotation Items Table
-  const tableData = (quotation.items || []).map((item, idx) => [
-    idx + 1,
-    item.product_name,
-    formatCurrency(item.unit_price),
-    item.quantity,
-    `${item.discount_percent || 0}%`,
-    `${item.gst_percent || 18}%`,
-    formatCurrency(item.total_price)
-  ]);
+  const tableData = (quotation.items || []).map((item, idx) => {
+    const discVal = parseFloat(item.discount_percent);
+    const gstVal = parseFloat(item.gst_percent);
+
+    return [
+      idx + 1,
+      item.product_name || 'N/A',
+      formatCurrencyPDF(item.unit_price),
+      item.quantity || 1,
+      discVal > 0 ? `${discVal}%` : '–',
+      gstVal > 0 ? `${gstVal}%` : '–',
+      formatCurrencyPDF(item.total_price)
+    ];
+  });
 
   doc.autoTable({
     startY: 83,
@@ -251,10 +290,10 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.text('Subtotal:', labelX, finalY);
-  doc.text(formatCurrency(quotation.subtotal), rightX, finalY, { align: 'right' });
+  doc.text(formatCurrencyPDF(quotation.subtotal), rightX, finalY, { align: 'right' });
 
   doc.text('Estimated GST:', labelX, finalY + 5);
-  doc.text(formatCurrency(quotation.tax_amount), rightX, finalY + 5, { align: 'right' });
+  doc.text(formatCurrencyPDF(quotation.tax_amount), rightX, finalY + 5, { align: 'right' });
 
   doc.setLineWidth(0.4);
   doc.setDrawColor(203, 213, 225);
@@ -263,7 +302,7 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.text('Quotation Total:', labelX, finalY + 15);
-  doc.text(formatCurrency(quotation.grand_total), rightX, finalY + 15, { align: 'right' });
+  doc.text(formatCurrencyPDF(quotation.grand_total), rightX, finalY + 15, { align: 'right' });
 
   // 6. Notes, Terms & Signature Area
   const footerY = finalY + 24;
