@@ -7,9 +7,10 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
-import { calculateCartTotals, formatCurrency } from '../../services/calcService';
+import { calculateCartTotals, formatCurrency, formatDate } from '../../services/calcService';
 import { generateQuotationPDF, printQuotationPDF } from '../../services/pdfService';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { FileText, Plus, Download, Printer, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function QuotationsPage() {
@@ -181,21 +182,63 @@ export default function QuotationsPage() {
 
   const columns = [
     {
-      header: 'Quotation Details',
+      header: 'Actions',
+      className: 'w-16 text-center',
       render: (row) => (
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 dark:text-amber-400">
-            <FileText className="w-5 h-5" />
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'Share on WhatsApp',
+              icon: WhatsAppIcon,
+              onClick: () => handleShareWhatsAppQuotation(row.id)
+            },
+            {
+              label: 'Download PDF',
+              icon: Download,
+              onClick: () => handleDownloadPDF(row.id)
+            },
+            {
+              label: 'Print Quotation',
+              icon: Printer,
+              onClick: () => handlePrintPDF(row.id)
+            },
+            {
+              label: 'Mark as ACCEPTED',
+              icon: CheckCircle,
+              onClick: () => handleStatusChange(row.id, 'ACCEPTED')
+            },
+            {
+              label: 'Mark as REJECTED',
+              icon: XCircle,
+              variant: 'danger',
+              onClick: () => handleStatusChange(row.id, 'REJECTED')
+            }
+          ]}
+        />
+      )
+    },
+    {
+      header: 'Quotation Number',
+      accessor: 'quotation_number',
+      render: (row) => (
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 dark:text-amber-400 flex-shrink-0">
+            <FileText className="w-4 h-4" />
           </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.quotation_number}</p>
-            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Date: {new Date(row.created_at).toLocaleDateString('en-IN')}</p>
-          </div>
+          <span className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.quotation_number}</span>
         </div>
       )
     },
     {
+      header: 'Date & Time',
+      accessor: 'created_at',
+      render: (row) => (
+        <span className="text-xs text-slate-500 font-medium">{formatDate(row.created_at, true)}</span>
+      )
+    },
+    {
       header: 'Client / Company',
+      accessor: 'customer_name',
       render: (row) => (
         <div className="text-xs">
           <p className="font-semibold text-slate-900 dark:text-[#F1F1F1]">{row.customer_name}</p>
@@ -205,62 +248,18 @@ export default function QuotationsPage() {
     },
     {
       header: 'Quotation Total',
+      accessor: 'grand_total',
       render: (row) => (
         <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C] text-sm">{formatCurrency(row.grand_total)}</span>
       )
     },
     {
       header: 'Status',
+      accessor: 'status',
       render: (row) => {
         const variants = { PENDING: 'warning', ACCEPTED: 'success', REJECTED: 'danger' };
         return <Badge variant={variants[row.status] || 'info'}>{row.status}</Badge>;
       }
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleShareWhatsAppQuotation(row.id)}
-            title="Share on WhatsApp"
-            className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer"
-          >
-            <WhatsAppIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDownloadPDF(row.id)}
-            title="Download PDF Quotation"
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-amber-600 dark:text-amber-400 cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handlePrintPDF(row.id)}
-            title="Print Quotation"
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-sky-600 dark:text-sky-400 cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
-          {row.status === 'PENDING' && (
-            <>
-              <button
-                onClick={() => handleStatusChange(row.id, 'ACCEPTED')}
-                title="Mark Accepted"
-                className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              >
-                <CheckCircle className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleStatusChange(row.id, 'REJECTED')}
-                title="Mark Rejected"
-                className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-600 dark:text-rose-400"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
-      )
     }
   ];
 

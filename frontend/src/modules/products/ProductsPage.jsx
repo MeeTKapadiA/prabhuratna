@@ -7,8 +7,9 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import BarcodeGenerator from '../../components/ui/BarcodeGenerator';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
+import { formatCurrency, formatDate } from '../../services/calcService';
 import { Plus, Edit2, Trash2, Package, ScanBarcode, RefreshCw, QrCode, Globe, Eye, EyeOff } from 'lucide-react';
 
 export default function ProductsPage() {
@@ -144,52 +145,87 @@ export default function ProductsPage() {
 
   const columns = [
     {
+      header: 'Actions',
+      className: 'w-16 text-center',
+      render: (row) => (
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'View Code (QR / Barcode)',
+              icon: QrCode,
+              onClick: () => {
+                setSelectedBarcodeProd(row);
+                setIsBarcodeModalOpen(true);
+              }
+            },
+            {
+              label: 'Edit Product',
+              icon: Edit2,
+              onClick: () => handleOpenEditModal(row)
+            },
+            {
+              label: row.show_on_website === 1 ? 'Hide on Website' : 'Show on Website',
+              icon: row.show_on_website === 1 ? EyeOff : Eye,
+              onClick: () => handleToggleWebsiteVisibility(row)
+            },
+            {
+              label: 'Delete Product',
+              icon: Trash2,
+              variant: 'danger',
+              onClick: () => handleDelete(row.id)
+            }
+          ]}
+        />
+      )
+    },
+    {
       header: 'Product Details',
+      accessor: 'name',
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400">
+          <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 flex-shrink-0">
             <Package className="w-5 h-5" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{row.name}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Category: {row.category} | Brand: {row.brand}</p>
+            <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.name}</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Category: {row.category} | Brand: {row.brand}</p>
           </div>
         </div>
       )
     },
     {
-      header: 'Visual Barcode',
+      header: 'Barcode & QR Code',
+      accessor: 'sku',
       render: (row) => (
         <div className="flex flex-col items-start gap-1">
-          {row.barcode ? (
-            <div
-              onClick={() => {
-                setSelectedBarcodeProd(row);
-                setIsBarcodeModalOpen(true);
-              }}
-              className="cursor-pointer hover:opacity-80 transition-opacity"
-              title="Click to download or print barcode"
-            >
-              <BarcodeGenerator value={row.barcode} width={1.2} height={28} displayValue={true} />
-            </div>
-          ) : (
-            <span className="text-xs text-slate-500">No Barcode</span>
-          )}
-          <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">SKU: {row.sku}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedBarcodeProd(row);
+              setIsBarcodeModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] text-xs font-bold text-slate-700 dark:text-[#F1F1F1] hover:bg-slate-200 dark:hover:bg-[#2D3138] transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <QrCode className="w-3.5 h-3.5 text-[#C0392B] dark:text-[#E74C3C]" />
+            <span>View Code</span>
+          </button>
+          <span className="font-mono text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {row.sku} {row.barcode && `| Barcode: ${row.barcode}`}</span>
         </div>
       )
     },
     {
       header: 'Purchase / Selling',
+      accessor: 'selling_price',
       render: (row) => (
         <div className="text-xs">
-          <p className="text-slate-500 dark:text-slate-400">Cost: {formatCurrency(row.purchase_price)}</p>
+          <p className="text-slate-500 dark:text-[#9CA3AF]">Cost: {formatCurrency(row.purchase_price)}</p>
           <p className="font-bold text-emerald-600 dark:text-emerald-400">Price: {formatCurrency(row.selling_price)}</p>
         </div>
       )
     },
     {
       header: 'Stock Level',
+      accessor: 'stock_quantity',
       render: (row) => {
         let badgeVariant = 'success';
         let text = `${row.stock_quantity} in stock`;
@@ -205,50 +241,20 @@ export default function ProductsPage() {
     },
     {
       header: 'Website Display',
+      accessor: 'show_on_website',
       render: (row) => (
         <button
           onClick={() => handleToggleWebsiteVisibility(row)}
           title="Click to toggle display on customer website catalog"
-          className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
+          className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
             row.show_on_website === 1
               ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30'
-              : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 opacity-60 hover:opacity-100'
+              : 'bg-slate-200 dark:bg-[#121417] text-slate-500 dark:text-[#9CA3AF] border-slate-300 dark:border-[#2D3138] opacity-60 hover:opacity-100'
           }`}
         >
           {row.show_on_website === 1 ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
           <span>{row.show_on_website === 1 ? 'Displayed' : 'Hidden'}</span>
         </button>
-      )
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => {
-              setSelectedBarcodeProd(row);
-              setIsBarcodeModalOpen(true);
-            }}
-            title="Download / Print Barcode"
-            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-sky-500"
-          >
-            <ScanBarcode className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleOpenEditModal(row)}
-            title="Edit Product"
-            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-amber-500"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDelete(row.id)}
-            title="Delete Product"
-            className="p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-500 dark:text-rose-400"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
       )
     }
   ];
@@ -314,6 +320,7 @@ export default function ProductsPage() {
               value={selectedBarcodeProd.barcode}
               productName={selectedBarcodeProd.name}
               price={selectedBarcodeProd.selling_price}
+              sku={selectedBarcodeProd.sku}
               width={2}
               height={60}
               displayValue={true}

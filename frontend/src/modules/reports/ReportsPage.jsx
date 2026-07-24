@@ -142,8 +142,8 @@ export default function ReportsPage() {
         { header: 'Units Sold', accessor: 'total_sold' },
         { header: 'Total Cost', render: (row) => formatCurrency(row.total_cost) },
         { header: 'Total Revenue', render: (row) => formatCurrency(row.total_revenue) },
-        { header: 'Gross Profit', render: (row) => <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{formatCurrency(row.gross_profit)}</span> },
-        { header: 'Margin %', render: (row) => <Badge variant="success">{row.profit_margin_percent.toFixed(1)}%</Badge> }
+        { header: 'Gross Profit', render: (row) => <span className={`font-extrabold ${(row.gross_profit || 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>{formatCurrency(row.gross_profit || 0)}</span> },
+        { header: 'Margin %', render: (row) => <Badge variant={(row.gross_profit || 0) >= 0 ? 'success' : 'danger'}>{(Number(row.profit_margin_percent) || 0).toFixed(1)}%</Badge> }
       ];
     }
   };
@@ -255,15 +255,15 @@ export default function ReportsPage() {
             <>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Total Invoices</p>
-                <p className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] mt-1">{summary.totalCount}</p>
+                <p className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] mt-1">{summary.totalCount ?? summary.invoiceCount ?? 0}</p>
               </div>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Total GST Tax</p>
-                <p className="text-xl font-extrabold text-[#C0392B] dark:text-[#E74C3C] mt-1">{formatCurrency(summary.totalTax)}</p>
+                <p className="text-xl font-extrabold text-[#C0392B] dark:text-[#E74C3C] mt-1">{formatCurrency(summary.totalTax || 0)}</p>
               </div>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Total Revenue</p>
-                <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(summary.totalRevenue)}</p>
+                <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(summary.totalRevenue ?? summary.totalSales ?? 0)}</p>
               </div>
             </>
           )}
@@ -272,15 +272,15 @@ export default function ReportsPage() {
             <>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Total Items In Stock</p>
-                <p className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] mt-1">{summary.totalUnits}</p>
+                <p className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] mt-1">{summary.totalUnits ?? summary.totalStock ?? 0}</p>
               </div>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Total Cost Valuation</p>
-                <p className="text-xl font-extrabold text-[#C0392B] dark:text-[#E74C3C] mt-1">{formatCurrency(summary.totalCostValuation)}</p>
+                <p className="text-xl font-extrabold text-[#C0392B] dark:text-[#E74C3C] mt-1">{formatCurrency(summary.totalCostValuation || 0)}</p>
               </div>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Retail Stock Potential</p>
-                <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(summary.totalRetailValuation)}</p>
+                <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(summary.totalRetailValuation || 0)}</p>
               </div>
             </>
           )}
@@ -289,15 +289,15 @@ export default function ReportsPage() {
             <>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Total Sales Revenue</p>
-                <p className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] mt-1">{formatCurrency(summary.totalRevenue)}</p>
+                <p className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] mt-1">{formatCurrency(summary.totalRevenue || 0)}</p>
               </div>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Total Cost of Goods</p>
-                <p className="text-xl font-extrabold text-rose-500 mt-1">{formatCurrency(summary.totalCost)}</p>
+                <p className="text-xl font-extrabold text-rose-500 mt-1">{formatCurrency(summary.totalCost || 0)}</p>
               </div>
               <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
                 <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-bold uppercase">Overall Gross Profit</p>
-                <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(summary.totalGrossProfit)}</p>
+                <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(summary.totalGrossProfit ?? summary.totalProfit ?? 0)}</p>
               </div>
             </>
           )}

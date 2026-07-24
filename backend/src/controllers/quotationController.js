@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getFinancialYear } = require('../utils/fyHelper');
 
 exports.createQuotation = (req, res) => {
   try {
@@ -24,11 +25,25 @@ exports.createQuotation = (req, res) => {
       return res.status(400).json({ success: false, message: 'Quotation items are required' });
     }
 
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const quotationNumber = `QTN-${dateStr}-${randomNum}`;
-
     const transaction = db.transaction(() => {
+      // Atomic sequential quotation number generation
+      const fy = getFinancialYear();
+      db.prepare(`
+        INSERT INTO quotation_counters (financial_year, last_number)
+        VALUES (?, 0)
+        ON CONFLICT(financial_year) DO NOTHING
+      `).run(fy);
+
+      db.prepare(`
+        UPDATE quotation_counters
+        SET last_number = last_number + 1
+        WHERE financial_year = ?
+      `).run(fy);
+
+      const counterRow = db.prepare('SELECT last_number FROM quotation_counters WHERE financial_year = ?').get(fy);
+      const paddedNumber = String(counterRow.last_number).padStart(4, '0');
+      const quotationNumber = `QTN/${fy}/${paddedNumber}`;
+
       const qtnStmt = db.prepare(`
         INSERT INTO quotations (
           quotation_number, customer_name, customer_phone, customer_email, customer_address,

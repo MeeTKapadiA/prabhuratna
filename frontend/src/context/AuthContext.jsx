@@ -14,6 +14,15 @@ export function AuthProvider({ children }) {
   const role = user?.role || 'staff';
   const isAdmin = role === 'admin';
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setToken(null);
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
   // Permission check helper
   const hasPermission = (module, action = 'view') => {
     if (isAdmin) return true; // Admin has full unrestricted access

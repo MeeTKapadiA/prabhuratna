@@ -7,7 +7,9 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import StatCard from '../../components/ui/StatCard';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
+import { formatDate } from '../../services/calcService';
 import {
   Users,
   UserCheck,
@@ -159,7 +161,53 @@ export default function UsersPage() {
 
   const columns = [
     {
+      header: 'Actions',
+      className: 'w-16 text-center',
+      render: (row) => (
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'Edit User Profile',
+              icon: Edit2,
+              onClick: () => {
+                setSelectedUser(row);
+                setFormData({
+                  name: row.name,
+                  username: row.username || '',
+                  email: row.email,
+                  role: row.role,
+                  status: row.status
+                });
+                setIsEditModalOpen(true);
+              }
+            },
+            {
+              label: 'Reset Password',
+              icon: Key,
+              onClick: () => {
+                setSelectedUser(row);
+                setNewPassword('');
+                setIsResetModalOpen(true);
+              }
+            },
+            {
+              label: row.status === 'active' ? 'Deactivate Account' : 'Activate Account',
+              icon: row.status === 'active' ? ToggleLeft : ToggleRight,
+              onClick: () => handleToggleStatus(row)
+            },
+            {
+              label: 'Delete User',
+              icon: Trash2,
+              variant: 'danger',
+              onClick: () => handleDeleteUser(row)
+            }
+          ]}
+        />
+      )
+    },
+    {
       header: 'User Profile & Username',
+      accessor: 'name',
       render: (row) => (
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-sm ${
@@ -176,6 +224,7 @@ export default function UsersPage() {
     },
     {
       header: 'System Role',
+      accessor: 'role',
       render: (row) => (
         <Badge variant={row.role === 'admin' ? 'danger' : 'info'}>
           {row.role.toUpperCase()}
@@ -184,10 +233,11 @@ export default function UsersPage() {
     },
     {
       header: 'Status',
+      accessor: 'status',
       render: (row) => (
         <button
           onClick={() => handleToggleStatus(row)}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
             row.status === 'active'
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
               : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
@@ -201,52 +251,11 @@ export default function UsersPage() {
     },
     {
       header: 'Last Session Login',
+      accessor: 'last_login',
       render: (row) => (
         <span className="text-xs text-slate-500 dark:text-[#9CA3AF]">
-          {row.last_login ? new Date(row.last_login).toLocaleString('en-IN') : 'Never Logged In'}
+          {row.last_login ? formatDate(row.last_login, true) : 'Never Logged In'}
         </span>
-      )
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => {
-              setSelectedUser(row);
-              setFormData({
-                name: row.name,
-                username: row.username || '',
-                email: row.email,
-                role: row.role,
-                status: row.status
-              });
-              setIsEditModalOpen(true);
-            }}
-            title="Edit User Details"
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-amber-600 dark:text-amber-400"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedUser(row);
-              setNewPassword('');
-              setIsResetModalOpen(true);
-            }}
-            title="Reset User Password"
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-sky-600 dark:text-sky-400"
-          >
-            <Key className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDeleteUser(row)}
-            title="Delete User Account"
-            className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-600 dark:text-rose-400"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
       )
     }
   ];

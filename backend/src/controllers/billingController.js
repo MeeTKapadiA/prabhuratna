@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getFinancialYear } = require('../utils/fyHelper');
 
 exports.createInvoice = (req, res) => {
   try {
@@ -57,13 +58,26 @@ exports.createInvoice = (req, res) => {
     const finalTax = parseFloat(rawTaxAmount) > 0 ? parseFloat(rawTaxAmount) : Math.round(calcTax * 100) / 100;
     const finalGrandTotal = parseFloat(rawGrandTotal) > 0 ? parseFloat(rawGrandTotal) : Math.round((finalSubtotal + finalTax - calcDiscount) * 100) / 100;
 
-    // Generate unique invoice number
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const invoiceNumber = `INV-${dateStr}-${randomNum}`;
-
-    // Execute in transaction
+    // Execute in transaction (atomic & thread-safe)
     const transaction = db.transaction(() => {
+      // Atomic sequential GST invoice number generation
+      const fy = getFinancialYear();
+      db.prepare(`
+        INSERT INTO invoice_counters (financial_year, last_number)
+        VALUES (?, 0)
+        ON CONFLICT(financial_year) DO NOTHING
+      `).run(fy);
+
+      db.prepare(`
+        UPDATE invoice_counters
+        SET last_number = last_number + 1
+        WHERE financial_year = ?
+      `).run(fy);
+
+      const counterRow = db.prepare('SELECT last_number FROM invoice_counters WHERE financial_year = ?').get(fy);
+      const paddedNumber = String(counterRow.last_number).padStart(4, '0');
+      const invoiceNumber = `INV/${fy}/${paddedNumber}`;
+
       // 1. Insert Invoice
       const invoiceStmt = db.prepare(`
         INSERT INTO invoices (

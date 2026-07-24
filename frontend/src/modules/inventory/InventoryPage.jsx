@@ -6,9 +6,10 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import SearchBar from '../../components/ui/SearchBar';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
 import { formatCurrency } from '../../services/calcService';
-import { Boxes, TrendingUp, AlertTriangle, History, Plus, ArrowUpRight, ArrowDownRight, Printer } from 'lucide-react';
+import { Boxes, ArrowUpDown, AlertTriangle, TrendingUp, TrendingDown, Plus, Minus, History, QrCode, RefreshCw } from 'lucide-react';
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState('stock'); // 'stock', 'fast', 'slow', 'logs'
@@ -80,7 +81,28 @@ export default function InventoryPage() {
 
   const stockColumns = [
     {
+      header: 'Actions',
+      className: 'w-16 text-center',
+      render: (row) => (
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'Adjust Stock Quantity',
+              icon: RefreshCw,
+              onClick: () => {
+                setSelectedProduct(row);
+                setQuantityChange('10');
+                setAdjustmentNotes('');
+                setIsModalOpen(true);
+              }
+            }
+          ]}
+        />
+      )
+    },
+    {
       header: 'Product Name',
+      accessor: 'name',
       render: (row) => (
         <div>
           <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.name}</p>
@@ -90,18 +112,21 @@ export default function InventoryPage() {
     },
     {
       header: 'Category & Brand',
+      accessor: 'category',
       render: (row) => (
         <span className="text-xs text-slate-700 dark:text-[#9CA3AF]">{row.category} / {row.brand}</span>
       )
     },
     {
       header: 'Current Stock',
+      accessor: 'stock_quantity',
       render: (row) => (
         <span className="font-extrabold text-sm text-[#C0392B] dark:text-[#E74C3C]">{row.stock_quantity} units</span>
       )
     },
     {
       header: 'Valuation (₹)',
+      accessor: 'purchase_price',
       render: (row) => (
         <div className="text-xs">
           <p className="font-semibold text-slate-900 dark:text-[#F1F1F1]">Cost: {formatCurrency(row.purchase_price * row.stock_quantity)}</p>
@@ -111,6 +136,7 @@ export default function InventoryPage() {
     },
     {
       header: 'Stock Status',
+      accessor: 'min_stock_level',
       render: (row) => {
         let variant = 'success';
         let label = 'Healthy Stock';
@@ -123,24 +149,6 @@ export default function InventoryPage() {
         }
         return <Badge variant={variant}>{label}</Badge>;
       }
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <Button
-          onClick={() => {
-            setSelectedProduct(row);
-            setQuantityChange('10');
-            setAdjustmentNotes('');
-            setIsModalOpen(true);
-          }}
-          variant="secondary"
-          size="sm"
-          icon={Plus}
-        >
-          Adjust Stock
-        </Button>
-      )
     }
   ];
 

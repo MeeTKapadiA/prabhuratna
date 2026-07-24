@@ -7,9 +7,10 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import StatCard from '../../components/ui/StatCard';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
-import { Truck, Plus, Edit2, CreditCard, Phone, Mail, Building2, Wallet } from 'lucide-react';
+import { formatCurrency, formatDate } from '../../services/calcService';
+import { Plus, Edit2, Trash2, Truck, Phone, Mail, MapPin, DollarSign, History, Receipt } from 'lucide-react';
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState([]);
@@ -160,7 +161,28 @@ export default function SuppliersPage() {
 
   const columns = [
     {
+      header: 'Actions',
+      className: 'w-16 text-center',
+      render: (row) => (
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'Record Payment / History',
+              icon: DollarSign,
+              onClick: () => handleOpenPaymentModal(row)
+            },
+            {
+              label: 'Edit Supplier Details',
+              icon: Edit2,
+              onClick: () => handleOpenEditModal(row)
+            }
+          ]}
+        />
+      )
+    },
+    {
       header: 'Supplier Name',
+      accessor: 'name',
       render: (row) => (
         <div>
           <p className="font-extrabold text-slate-900 dark:text-[#F1F1F1]">{row.name}</p>
@@ -170,6 +192,7 @@ export default function SuppliersPage() {
     },
     {
       header: 'Contact Info',
+      accessor: 'phone',
       render: (row) => (
         <div className="text-xs space-y-0.5">
           {row.phone && <p className="flex items-center gap-1 text-slate-700 dark:text-[#9CA3AF]"><Phone className="w-3 h-3" /> {row.phone}</p>}
@@ -179,10 +202,12 @@ export default function SuppliersPage() {
     },
     {
       header: 'Opening Balance',
+      accessor: 'opening_balance',
       render: (row) => formatCurrency(row.opening_balance || 0)
     },
     {
       header: 'Current Running Dues',
+      accessor: 'current_balance',
       render: (row) => {
         const bal = row.current_balance || 0;
         return (
@@ -198,29 +223,6 @@ export default function SuppliersPage() {
           </div>
         );
       }
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => handleOpenEditModal(row)}
-            icon={Edit2}
-          >
-            Edit
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => handleOpenPaymentModal(row)}
-            icon={CreditCard}
-          >
-            Record Payment
-          </Button>
-        </div>
-      )
     }
   ];
 

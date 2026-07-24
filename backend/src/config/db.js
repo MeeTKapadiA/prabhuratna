@@ -257,6 +257,24 @@ function initDb() {
     );
   `);
 
+  // Invoice Counters Table (GST Sequential Billing)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS invoice_counters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      financial_year TEXT UNIQUE NOT NULL,
+      last_number INTEGER DEFAULT 0
+    );
+  `);
+
+  // Quotation Counters Table (Sequential Quotation Billing)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS quotation_counters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      financial_year TEXT UNIQUE NOT NULL,
+      last_number INTEGER DEFAULT 0
+    );
+  `);
+
   // Migrations wrapped in try/catch
   try {
     db.exec(`ALTER TABLE return_items ADD COLUMN is_damaged INTEGER DEFAULT 0`);

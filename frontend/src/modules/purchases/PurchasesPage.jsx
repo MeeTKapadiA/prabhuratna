@@ -6,9 +6,10 @@ import Modal from '../../components/ui/Modal';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
-import { ShoppingBag, Plus, Trash2, Eye, CreditCard, Calendar, Filter, FileText } from 'lucide-react';
+import { formatCurrency, formatDate } from '../../services/calcService';
+import { ShoppingBag, Plus, Eye, CreditCard, Trash2, Calendar, FileText, CheckCircle } from 'lucide-react';
 
 export default function PurchasesPage() {
   const [activeTab, setActiveTab] = useState('history'); // 'history' or 'new'
@@ -209,45 +210,59 @@ export default function PurchasesPage() {
 
   const columns = [
     {
-      header: 'Purchase Number',
+      header: 'Actions',
+      className: 'w-16 text-center',
       render: (row) => (
-        <div>
-          <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{row.purchase_number}</span>
-          <p className="text-xs text-slate-500">{new Date(row.created_at).toLocaleDateString('en-IN')}</p>
-        </div>
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'View Purchase Details',
+              icon: Eye,
+              onClick: () => handleOpenDetailModal(row.id)
+            },
+            {
+              label: 'Record Payment',
+              icon: CreditCard,
+              hidden: row.payment_status === 'paid',
+              onClick: () => handleOpenPaymentModal(row)
+            }
+          ]}
+        />
+      )
+    },
+    {
+      header: 'Purchase Number',
+      accessor: 'purchase_number',
+      render: (row) => (
+        <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{row.purchase_number}</span>
+      )
+    },
+    {
+      header: 'Date & Time',
+      accessor: 'created_at',
+      render: (row) => (
+        <span className="text-xs text-slate-500 font-medium">{formatDate(row.created_at, true)}</span>
       )
     },
     { header: 'Supplier Name', accessor: 'supplier_name' },
     {
       header: 'Grand Total',
+      accessor: 'grand_total',
       render: (row) => <span className="font-bold">{formatCurrency(row.grand_total)}</span>
     },
     {
       header: 'Payment Status',
+      accessor: 'payment_status',
       render: (row) => getStatusBadge(row.payment_status)
     },
     {
       header: 'Amount Paid',
+      accessor: 'amount_paid',
       render: (row) => (
         <div>
           <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(row.amount_paid || 0)}</p>
           {row.grand_total - row.amount_paid > 0 && (
             <p className="text-[10px] text-rose-500">Due: {formatCurrency(row.grand_total - row.amount_paid)}</p>
-          )}
-        </div>
-      )
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => handleOpenDetailModal(row.id)} icon={Eye}>
-            View
-          </Button>
-          {row.payment_status !== 'paid' && (
-            <Button size="sm" variant="primary" onClick={() => handleOpenPaymentModal(row)} icon={CreditCard}>
-              Pay
-            </Button>
           )}
         </div>
       )

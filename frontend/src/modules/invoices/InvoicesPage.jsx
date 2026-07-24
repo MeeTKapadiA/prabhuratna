@@ -8,10 +8,11 @@ import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import StatCard from '../../components/ui/StatCard';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
+import { formatCurrency, formatDate } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
-import { Receipt, Eye, Printer, Phone, Mail, FileSpreadsheet, Calendar, DollarSign, CreditCard } from 'lucide-react';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
+import { Receipt, Eye, Printer, Download, Phone, Mail, FileSpreadsheet, Calendar, DollarSign, CreditCard } from 'lucide-react';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
@@ -88,16 +89,73 @@ export default function InvoicesPage() {
 
   const columns = [
     {
-      header: 'Invoice Number',
+      header: 'Actions',
+      className: 'w-16 text-center',
       render: (row) => (
-        <div>
-          <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{row.invoice_number}</span>
-          <p className="text-xs text-slate-500">{new Date(row.created_at).toLocaleString('en-IN')}</p>
-        </div>
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'View Invoice Details',
+              icon: Eye,
+              onClick: () => handleOpenDetailModal(row.id)
+            },
+            {
+              label: 'Share on WhatsApp',
+              icon: WhatsAppIcon,
+              onClick: async () => {
+                try {
+                  const res = await apiRequest(`/billing/invoices/${row.id}`);
+                  if (res.success && res.invoice) {
+                    shareOnWhatsApp('invoice', res.invoice, settings, (msg) => setToast({ isOpen: true, type: 'info', message: msg }));
+                  }
+                } catch (e) {}
+              }
+            },
+            {
+              label: 'Print Receipt',
+              icon: Printer,
+              onClick: async () => {
+                try {
+                  const res = await apiRequest(`/billing/invoices/${row.id}`);
+                  if (res.success && res.invoice) {
+                    printInvoicePDF(res.invoice, settings);
+                  }
+                } catch (e) {}
+              }
+            },
+            {
+              label: 'Download PDF',
+              icon: Download,
+              onClick: async () => {
+                try {
+                  const res = await apiRequest(`/billing/invoices/${row.id}`);
+                  if (res.success && res.invoice) {
+                    generateInvoicePDF(res.invoice, { settings });
+                  }
+                } catch (e) {}
+              }
+            }
+          ]}
+        />
+      )
+    },
+    {
+      header: 'Invoice Number',
+      accessor: 'invoice_number',
+      render: (row) => (
+        <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{row.invoice_number}</span>
+      )
+    },
+    {
+      header: 'Date & Time',
+      accessor: 'created_at',
+      render: (row) => (
+        <span className="text-xs text-slate-500 font-medium">{formatDate(row.created_at, true)}</span>
       )
     },
     {
       header: 'Customer Details',
+      accessor: 'customer_name',
       render: (row) => (
         <div>
           <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.customer_name || 'Walk-in Customer'}</p>
@@ -107,27 +165,23 @@ export default function InvoicesPage() {
     },
     {
       header: 'Payment Mode',
+      accessor: 'payment_mode',
       render: (row) => getPaymentBadge(row.payment_mode)
     },
     {
       header: 'Tax (GST)',
+      accessor: 'tax_amount',
       render: (row) => formatCurrency(row.tax_amount || 0)
     },
     {
       header: 'Discount',
+      accessor: 'discount_amount',
       render: (row) => formatCurrency(row.discount_amount || 0)
     },
     {
       header: 'Grand Total',
+      accessor: 'grand_total',
       render: (row) => <span className="font-extrabold text-sm text-slate-900 dark:text-[#F1F1F1]">{formatCurrency(row.grand_total)}</span>
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <Button size="sm" variant="secondary" onClick={() => handleOpenDetailModal(row.id)} icon={Eye}>
-          View Receipt
-        </Button>
-      )
     }
   ];
 
@@ -230,7 +284,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="text-slate-500 font-bold uppercase">Invoice Metadata</p>
                 <p className="font-bold text-slate-900 dark:text-[#F1F1F1] mt-0.5">{selectedInvoice.invoice_number}</p>
-                <p className="text-slate-500 mt-0.5">Date: {new Date(selectedInvoice.created_at).toLocaleString('en-IN')}</p>
+                <p className="text-slate-500 mt-0.5">Date: {formatDate(selectedInvoice.created_at, true)}</p>
                 <p className="text-slate-500 mt-0.5">Payment Mode: {getPaymentBadge(selectedInvoice.payment_mode)}</p>
               </div>
             </div>
@@ -240,38 +294,41 @@ export default function InvoicesPage() {
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
                 Purchased Items
               </h4>
-              <div className="divide-y divide-slate-200 dark:divide-[#2D3138] border border-slate-200 dark:border-[#2D3138] rounded-xl overflow-hidden">
-                {selectedInvoice.items?.map((item, idx) => (
-                  <div key={idx} className="p-3 bg-white dark:bg-[#1E2126] flex justify-between items-center text-xs">
+
+              <div className="divide-y divide-slate-200 dark:divide-[#2D3138] border border-slate-200 dark:border-[#2D3138] rounded-xl overflow-hidden bg-white dark:bg-[#1E2126]">
+                {selectedInvoice.items && selectedInvoice.items.map((item, idx) => (
+                  <div key={idx} className="p-3 flex justify-between items-center text-xs">
                     <div>
-                      <p className="font-extrabold text-slate-900 dark:text-[#F1F1F1]">{item.product_name}</p>
-                      <p className="text-slate-500">{item.quantity} x {formatCurrency(item.unit_price)} (GST: {item.gst_percent}%)</p>
+                      <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{item.product_name}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">
+                        {item.quantity} x {formatCurrency(item.unit_price)} (GST: {item.gst_percent}%)
+                      </p>
                     </div>
-                    <span className="font-extrabold text-slate-900 dark:text-[#F1F1F1]">{formatCurrency(item.total_price)}</span>
+                    <span className="font-bold text-slate-900 dark:text-[#F1F1F1]">{formatCurrency(item.total_price)}</span>
                   </div>
                 ))}
               </div>
-            </div>
 
-            {/* Financial Summary */}
-            <div className="p-3 bg-slate-50 dark:bg-[#121417] rounded-xl border border-slate-200 dark:border-[#2D3138] space-y-1.5 text-xs">
-              <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
-                <span>Subtotal:</span>
-                <span>{formatCurrency(selectedInvoice.subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
-                <span>GST Tax:</span>
-                <span>{formatCurrency(selectedInvoice.tax_amount)}</span>
-              </div>
-              {selectedInvoice.discount_amount > 0 && (
-                <div className="flex justify-between text-rose-500">
-                  <span>Discount Applied:</span>
-                  <span>- {formatCurrency(selectedInvoice.discount_amount)}</span>
+              {/* Totals Summary Box */}
+              <div className="p-4 bg-slate-50 dark:bg-[#121417] rounded-xl border border-slate-200 dark:border-[#2D3138] space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(selectedInvoice.subtotal)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-base font-extrabold text-slate-900 dark:text-[#F1F1F1] pt-2 border-t border-slate-200 dark:border-[#2D3138]">
-                <span>Grand Total Paid:</span>
-                <span className="text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(selectedInvoice.grand_total)}</span>
+                <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                  <span>GST Tax:</span>
+                  <span>{formatCurrency(selectedInvoice.tax_amount)}</span>
+                </div>
+                {selectedInvoice.discount_amount > 0 && (
+                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                    <span>Discount:</span>
+                    <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-extrabold text-slate-900 dark:text-[#F1F1F1] pt-2 border-t border-slate-200 dark:border-[#2D3138]">
+                  <span>Grand Total Paid:</span>
+                  <span className="text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(selectedInvoice.grand_total)}</span>
+                </div>
               </div>
             </div>
 
@@ -292,9 +349,6 @@ export default function InvoicesPage() {
                   Download PDF
                 </Button>
               </div>
-              <Button onClick={() => setIsModalOpen(false)} variant="ghost">
-                Close
-              </Button>
             </div>
           </div>
         </Modal>

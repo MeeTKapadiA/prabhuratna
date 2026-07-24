@@ -72,3 +72,31 @@ export function formatCurrency(amount = 0, showDecimals = false) {
 
   return `₹${formatted}`;
 }
+
+export function formatDate(dateStr, includeTime = false) {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    
+    const day = String(d.getDate()).padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[d.getMonth()];
+    const year = d.getFullYear();
+
+    if (!includeTime) {
+      return `${day} ${month} ${year}`;
+    }
+
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strHours = String(hours).padStart(2, '0');
+
+    return `${day} ${month} ${year}, ${strHours}:${minutes} ${ampm}`;
+  } catch (e) {
+    return String(dateStr);
+  }
+}

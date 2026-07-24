@@ -34,15 +34,18 @@ exports.getSalesReport = (req, res) => {
     const sales = db.prepare(query).all(...params);
 
     const summary = sales.reduce((acc, curr) => {
-      acc.totalSales += curr.grand_total;
-      acc.totalTax += curr.tax_amount;
-      acc.totalDiscount += curr.discount_amount;
+      acc.totalSales += curr.grand_total || 0;
+      acc.totalRevenue += curr.grand_total || 0;
+      acc.totalTax += curr.tax_amount || 0;
+      acc.totalDiscount += curr.discount_amount || 0;
       acc.invoiceCount += 1;
+      acc.totalCount += 1;
       return acc;
-    }, { totalSales: 0, totalTax: 0, totalDiscount: 0, invoiceCount: 0 });
+    }, { totalSales: 0, totalRevenue: 0, totalTax: 0, totalDiscount: 0, invoiceCount: 0, totalCount: 0 });
 
     return res.json({ success: true, summary, sales });
   } catch (error) {
+    console.error('Error generating sales report:', error);
     return res.status(500).json({ success: false, message: 'Failed to generate sales report' });
   }
 };
@@ -76,15 +79,17 @@ exports.getInventoryReport = (req, res) => {
     const inventory = db.prepare(query).all(...params);
 
     const summary = inventory.reduce((acc, curr) => {
-      acc.totalStock += curr.stock_quantity;
-      acc.totalCostValuation += curr.cost_value;
-      acc.totalRetailValuation += curr.retail_value;
+      acc.totalStock += curr.stock_quantity || 0;
+      acc.totalUnits += curr.stock_quantity || 0;
+      acc.totalCostValuation += curr.cost_value || 0;
+      acc.totalRetailValuation += curr.retail_value || 0;
       if (curr.stock_quantity <= curr.min_stock_level) acc.lowStockCount += 1;
       return acc;
-    }, { totalStock: 0, totalCostValuation: 0, totalRetailValuation: 0, lowStockCount: 0 });
+    }, { totalStock: 0, totalUnits: 0, totalCostValuation: 0, totalRetailValuation: 0, lowStockCount: 0 });
 
     return res.json({ success: true, summary, inventory });
   } catch (error) {
+    console.error('Error generating inventory report:', error);
     return res.status(500).json({ success: false, message: 'Failed to generate inventory report' });
   }
 };
@@ -95,15 +100,15 @@ exports.getProfitReport = (req, res) => {
     let query = `
       SELECT 
         ii.product_name,
-        p.sku,
-        p.barcode,
+        COALESCE(p.sku, 'N/A') as sku,
+        COALESCE(p.barcode, 'N/A') as barcode,
         SUM(ii.quantity) as total_sold,
-        SUM(ii.quantity * p.purchase_price) as total_cost,
+        SUM(ii.quantity * COALESCE(p.purchase_price, 0)) as total_cost,
         SUM(ii.total_price) as total_revenue,
-        (SUM(ii.total_price) - SUM(ii.quantity * p.purchase_price)) as gross_profit,
+        (SUM(ii.total_price) - SUM(ii.quantity * COALESCE(p.purchase_price, 0))) as gross_profit,
         CASE 
           WHEN SUM(ii.total_price) > 0 THEN 
-            ((SUM(ii.total_price) - SUM(ii.quantity * p.purchase_price)) / SUM(ii.total_price)) * 100
+            ((SUM(ii.total_price) - SUM(ii.quantity * COALESCE(p.purchase_price, 0))) / SUM(ii.total_price)) * 100
           ELSE 0
         END as profit_margin_percent
       FROM invoice_items ii
@@ -122,16 +127,17 @@ exports.getProfitReport = (req, res) => {
       params.push(endDate);
     }
 
-    query += ` GROUP BY ii.product_id, ii.product_name ORDER BY gross_profit DESC`;
+    query += ` GROUP BY ii.product_name ORDER BY gross_profit DESC`;
 
     const profitData = db.prepare(query).all(...params);
 
     const summary = profitData.reduce((acc, curr) => {
-      acc.totalRevenue += curr.total_revenue;
-      acc.totalCost += curr.total_cost;
-      acc.totalProfit += curr.gross_profit;
+      acc.totalRevenue += curr.total_revenue || 0;
+      acc.totalCost += curr.total_cost || 0;
+      acc.totalProfit += curr.gross_profit || 0;
+      acc.totalGrossProfit += curr.gross_profit || 0;
       return acc;
-    }, { totalRevenue: 0, totalCost: 0, totalProfit: 0 });
+    }, { totalRevenue: 0, totalCost: 0, totalProfit: 0, totalGrossProfit: 0 });
 
     summary.overallMargin = summary.totalRevenue > 0 ? ((summary.totalProfit / summary.totalRevenue) * 100).toFixed(2) : 0;
 

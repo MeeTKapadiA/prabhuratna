@@ -50,6 +50,7 @@ export async function apiRequest(endpoint, method = 'GET', data = null, customHe
         // Token expired or invalid
         localStorage.removeItem('prabhuratna_token');
         localStorage.removeItem('prabhuratna_user');
+        window.dispatchEvent(new Event('auth:unauthorized'));
       }
       throw new Error(result.message || `API request failed with status ${response.status}`);
     }

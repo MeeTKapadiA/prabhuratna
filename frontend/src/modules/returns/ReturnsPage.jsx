@@ -6,8 +6,9 @@ import Modal from '../../components/ui/Modal';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
+import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
+import { formatCurrency, formatDate } from '../../services/calcService';
 import { RotateCcw, Search, Eye, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 
 export default function ReturnsPage() {
@@ -177,38 +178,53 @@ export default function ReturnsPage() {
 
   const columns = [
     {
-      header: 'Return Number',
+      header: 'Actions',
+      className: 'w-16 text-center',
       render: (row) => (
-        <div>
-          <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{row.return_number}</span>
-          <p className="text-xs text-slate-500">{new Date(row.created_at).toLocaleDateString('en-IN')}</p>
-        </div>
+        <TableActionsMenu
+          actions={[
+            {
+              label: 'View Return Details',
+              icon: Eye,
+              onClick: () => handleOpenDetailModal(row.id)
+            }
+          ]}
+        />
+      )
+    },
+    {
+      header: 'Return Number',
+      accessor: 'return_number',
+      render: (row) => (
+        <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{row.return_number}</span>
+      )
+    },
+    {
+      header: 'Date & Time',
+      accessor: 'created_at',
+      render: (row) => (
+        <span className="text-xs text-slate-500 font-medium">{formatDate(row.created_at, true)}</span>
       )
     },
     {
       header: 'Original Invoice',
+      accessor: 'invoice_number',
       render: (row) => row.invoice_number ? <span className="font-bold">{row.invoice_number}</span> : <span className="text-slate-400">Direct Return</span>
     },
     { header: 'Customer', accessor: 'customer_name' },
     {
       header: 'Refund Mode',
+      accessor: 'refund_mode',
       render: (row) => (
         <Badge variant={row.refund_mode === 'cash' ? 'info' : row.refund_mode === 'store_credit' ? 'warning' : 'success'}>
-          {row.refund_mode.toUpperCase()}
+          {row.refund_mode?.toUpperCase() || 'N/A'}
         </Badge>
       )
     },
     {
       header: 'Refund Amount',
+      accessor: 'refund_amount',
       render: (row) => <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{formatCurrency(row.refund_amount)}</span>
-    },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <Button size="sm" variant="secondary" onClick={() => handleOpenDetailModal(row.id)} icon={Eye}>
-          View Receipt
-        </Button>
-      )
     }
   ];
 
