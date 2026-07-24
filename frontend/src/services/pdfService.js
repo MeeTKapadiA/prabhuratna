@@ -18,6 +18,15 @@ export function formatCurrencyPDF(amount = 0, showDecimals = false) {
 }
 
 export function generateInvoicePDF(invoice, options = {}) {
+  const settings = options.settings || invoice.settings || {};
+  const shopName = settings.shop_name || 'Prabhuratna Metals Pvt. Ltd.';
+  const shopAddress = settings.shop_address || 'Main Market Road, Commercial Complex, Ahmedabad, GJ';
+  const shopGstin = settings.shop_gstin || '24ABCDE1234F1Z5';
+  const shopPhone = settings.shop_phone || '+91 98765 43210';
+  const shopEmail = settings.shop_email || 'info@prabhuratna.com';
+  const footerNote = settings.invoice_footer_note || 'Thank you for shopping with us! Visit again.';
+  const logoBase64 = settings.logo_base64 || '';
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -28,10 +37,19 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setFillColor(...BRAND_COLOR);
   doc.rect(0, 0, 210, 28, 'F');
 
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', 14, 4, 20, 20);
+    } catch (e) {
+      console.error('Failed to render logo in PDF:', e);
+    }
+  }
+
+  const titleX = logoBase64 ? 38 : 14;
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('PRABHURATNA METALS', 14, 16);
+  doc.setFontSize(16);
+  doc.text(shopName.toUpperCase(), titleX, 16);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -43,11 +61,11 @@ export function generateInvoicePDF(invoice, options = {}) {
 
   // Left: Store Address
   doc.setFont('helvetica', 'bold');
-  doc.text('Prabhuratna Metals Pvt. Ltd.', 14, 36);
+  doc.text(shopName, 14, 36);
   doc.setFont('helvetica', 'normal');
-  doc.text('Main Market Road, Commercial Complex, Ahmedabad, GJ', 14, 41);
-  doc.text('GSTIN: 24ABCDE1234F1Z5 | Ph: +91 98765 43210', 14, 46);
-  doc.text('Email: info@prabhuratna.com', 14, 51);
+  doc.text(shopAddress, 14, 41);
+  doc.text(`GSTIN: ${shopGstin} | Ph: ${shopPhone}`, 14, 46);
+  doc.text(`Email: ${shopEmail}`, 14, 51);
 
   // Right: Invoice Metadata (Two-Column Alignment)
   const metaLabelX = 150;
@@ -157,13 +175,20 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text('Terms & Conditions:', 14, footerY);
   doc.setFont('helvetica', 'normal');
   doc.text('1. Goods once sold will not be taken back or exchanged after 7 days.', 14, footerY + 4);
-  doc.text('2. All disputes are subject to Ahmedabad jurisdiction.', 14, footerY + 8);
+  doc.text('2. All disputes are subject to local jurisdiction.', 14, footerY + 8);
   doc.text('3. Computer Generated Tax Invoice.', 14, footerY + 12);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('For Prabhuratna Metals', 196, footerY + 4, { align: 'right' });
+  doc.text(`For ${shopName}`, 196, footerY + 4, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text('Authorized Signatory', 196, footerY + 16, { align: 'right' });
+
+  if (footerNote) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(footerNote, 105, footerY + 24, { align: 'center' });
+  }
 
   if (options.save !== false) {
     doc.save(`${invoice.invoice_number}.pdf`);
@@ -172,8 +197,8 @@ export function generateInvoicePDF(invoice, options = {}) {
   return doc;
 }
 
-export function printInvoicePDF(invoice) {
-  const doc = generateInvoicePDF(invoice, { save: false });
+export function printInvoicePDF(invoice, settings = null) {
+  const doc = generateInvoicePDF(invoice, { settings, save: false });
   const blobUrl = doc.output('bloburl');
   const printWindow = window.open(blobUrl, '_blank');
   if (printWindow) {
@@ -182,6 +207,14 @@ export function printInvoicePDF(invoice) {
 }
 
 export function generateQuotationPDF(quotation, options = {}) {
+  const settings = options.settings || quotation.settings || {};
+  const shopName = settings.shop_name || 'Prabhuratna Metals Pvt. Ltd.';
+  const shopAddress = settings.shop_address || 'Main Market Road, Commercial Complex, Ahmedabad, GJ';
+  const shopPhone = settings.shop_phone || '+91 98765 43210';
+  const shopEmail = settings.shop_email || 'info@prabhuratna.com';
+  const footerNote = settings.invoice_footer_note || 'Thank you for shopping with us! Visit again.';
+  const logoBase64 = settings.logo_base64 || '';
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -192,10 +225,19 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFillColor(...BRAND_COLOR);
   doc.rect(0, 0, 210, 28, 'F');
 
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', 14, 4, 20, 20);
+    } catch (e) {
+      console.error('Failed to render logo in PDF:', e);
+    }
+  }
+
+  const titleX = logoBase64 ? 38 : 14;
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('PRABHURATNA METALS', 14, 16);
+  doc.setFontSize(16);
+  doc.text(shopName.toUpperCase(), titleX, 16);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -206,10 +248,10 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFontSize(9);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Prabhuratna Metals Pvt. Ltd.', 14, 36);
+  doc.text(shopName, 14, 36);
   doc.setFont('helvetica', 'normal');
-  doc.text('Commercial Sales Division | Ph: +91 98765 43210', 14, 41);
-  doc.text('Email: info@prabhuratna.com', 14, 46);
+  doc.text(shopAddress, 14, 41);
+  doc.text(`Ph: ${shopPhone} | Email: ${shopEmail}`, 14, 46);
 
   // Right: Quotation Metadata (Two-Column Alignment)
   const metaLabelX = 150;
@@ -321,9 +363,16 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text('2. Delivery timelines will be confirmed upon purchase order receipt.', 14, footerY + 16);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('For Prabhuratna Metals', 196, footerY + 8, { align: 'right' });
+  doc.text(`For ${shopName}`, 196, footerY + 8, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text('Authorized Commercial Representative', 196, footerY + 20, { align: 'right' });
+
+  if (footerNote) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(footerNote, 105, footerY + 24, { align: 'center' });
+  }
 
   if (options.save !== false) {
     doc.save(`${quotation.quotation_number}.pdf`);
@@ -332,8 +381,8 @@ export function generateQuotationPDF(quotation, options = {}) {
   return doc;
 }
 
-export function printQuotationPDF(quotation) {
-  const doc = generateQuotationPDF(quotation, { save: false });
+export function printQuotationPDF(quotation, settings = null) {
+  const doc = generateQuotationPDF(quotation, { settings, save: false });
   const blobUrl = doc.output('bloburl');
   const printWindow = window.open(blobUrl, '_blank');
   if (printWindow) {

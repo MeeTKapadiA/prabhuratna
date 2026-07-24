@@ -9,10 +9,12 @@ import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
 import { calculateCartTotals, formatCurrency } from '../../services/calcService';
 import { generateQuotationPDF, printQuotationPDF } from '../../services/pdfService';
+import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
 import { FileText, Plus, Download, Printer, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function QuotationsPage() {
   const [quotations, setQuotations] = useState([]);
+  const [settings, setSettings] = useState({});
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -137,7 +139,7 @@ export default function QuotationsPage() {
     try {
       const res = await apiRequest(`/quotations/${id}`);
       if (res.success && res.quotation) {
-        generateQuotationPDF(res.quotation);
+        generateQuotationPDF(res.quotation, { settings });
         setToast({ isOpen: true, type: 'success', message: 'Quotation PDF Downloaded' });
       }
     } catch (err) {
@@ -149,10 +151,21 @@ export default function QuotationsPage() {
     try {
       const res = await apiRequest(`/quotations/${id}`);
       if (res.success && res.quotation) {
-        printQuotationPDF(res.quotation);
+        printQuotationPDF(res.quotation, settings);
       }
     } catch (err) {
       setToast({ isOpen: true, type: 'error', message: 'Failed to print quotation' });
+    }
+  };
+
+  const handleShareWhatsAppQuotation = async (id) => {
+    try {
+      const res = await apiRequest(`/quotations/${id}`);
+      if (res.success && res.quotation) {
+        shareOnWhatsApp('quotation', res.quotation, settings, (msg) => setToast({ isOpen: true, type: 'info', message: msg }));
+      }
+    } catch (err) {
+      setToast({ isOpen: true, type: 'error', message: 'Failed to share quotation' });
     }
   };
 
@@ -208,16 +221,23 @@ export default function QuotationsPage() {
       render: (row) => (
         <div className="flex items-center gap-2">
           <button
+            onClick={() => handleShareWhatsAppQuotation(row.id)}
+            title="Share on WhatsApp"
+            className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer"
+          >
+            <WhatsAppIcon className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => handleDownloadPDF(row.id)}
             title="Download PDF Quotation"
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-amber-600 dark:text-amber-400"
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-amber-600 dark:text-amber-400 cursor-pointer"
           >
             <Download className="w-4 h-4" />
           </button>
           <button
             onClick={() => handlePrintPDF(row.id)}
             title="Print Quotation"
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-sky-600 dark:text-sky-400"
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#121417] text-sky-600 dark:text-sky-400 cursor-pointer"
           >
             <Printer className="w-4 h-4" />
           </button>

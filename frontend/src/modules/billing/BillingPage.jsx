@@ -9,6 +9,7 @@ import { apiRequest } from '../../services/api';
 import { setupBarcodeScanner } from '../../services/barcodeScanner';
 import { calculateCartTotals, formatCurrency } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
+import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
 import {
   ScanBarcode,
   Search,
@@ -46,6 +47,15 @@ export default function BillingPage() {
 
   const [toast, setToast] = useState({ isOpen: false, type: 'info', message: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [settings, setSettings] = useState({});
+
+  useEffect(() => {
+    apiRequest('/settings').then((res) => {
+      if (res && res.success && res.settings) {
+        setSettings(res.settings);
+      }
+    }).catch(() => {});
+  }, []);
 
   const showToast = (message, type = 'success') => {
     setToast({ isOpen: true, type, message });
@@ -580,15 +590,22 @@ export default function BillingPage() {
         subtitle={`Invoice No: ${completedInvoice?.invoice_number}`}
         footer={
           <div className="flex flex-wrap gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => shareOnWhatsApp('invoice', completedInvoice, settings, (msg) => showToast(msg, 'info'))}
+              className="bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+            >
+              <WhatsAppIcon className="w-4 h-4" /> Share on WhatsApp
+            </button>
             <Button
-              onClick={() => printInvoicePDF(completedInvoice)}
+              onClick={() => printInvoicePDF(completedInvoice, settings)}
               variant="secondary"
               icon={Printer}
             >
               Print Invoice
             </Button>
             <Button
-              onClick={() => generateInvoicePDF(completedInvoice)}
+              onClick={() => generateInvoicePDF(completedInvoice, { settings })}
               variant="primary"
               icon={Printer}
             >

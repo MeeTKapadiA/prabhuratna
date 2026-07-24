@@ -247,6 +247,16 @@ function initDb() {
     );
   `);
 
+  // Settings Table (Key-Value)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT UNIQUE NOT NULL,
+      value TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Migrations wrapped in try/catch
   try {
     db.exec(`ALTER TABLE return_items ADD COLUMN is_damaged INTEGER DEFAULT 0`);
@@ -254,6 +264,26 @@ function initDb() {
   try {
     db.exec(`ALTER TABLE suppliers ADD COLUMN current_balance REAL DEFAULT 0.0`);
   } catch (e) {}
+
+  // Seed default business settings if empty
+  const defaultSettings = [
+    ['shop_name', 'Prabhuratna Metals Pvt. Ltd.'],
+    ['shop_address', 'Main Market Road, Commercial Complex, Ahmedabad, GJ'],
+    ['shop_phone', '+91 98765 43210'],
+    ['shop_email', 'info@prabhuratna.com'],
+    ['shop_gstin', '24ABCDE1234F1Z5'],
+    ['logo_base64', ''],
+    ['invoice_footer_note', 'Thank you for shopping with us! Visit again.']
+  ];
+
+  const insertSetting = db.prepare(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO NOTHING
+  `);
+
+  for (const [key, val] of defaultSettings) {
+    insertSetting.run(key, val);
+  }
 
   // Seed default admin & staff users
   const adminCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get('admin@prabhuratna.com', 'admin');

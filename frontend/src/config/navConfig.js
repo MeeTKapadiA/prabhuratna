@@ -10,7 +10,8 @@ import {
   RotateCcw,
   TrendingUp,
   BarChart3,
-  Users
+  Users,
+  Building2
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
@@ -113,6 +114,15 @@ export const NAV_ITEMS = [
     module: 'users',
     adminOnly: true,
     priority: 12
+  },
+  {
+    id: 'settings',
+    label: 'Business Settings',
+    path: '/app/settings',
+    icon: Building2,
+    module: 'settings',
+    adminOnly: true,
+    priority: 13
   }
 ];
 

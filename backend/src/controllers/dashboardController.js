@@ -23,6 +23,22 @@ exports.getDashboardStats = (req, res) => {
     const lowStockProducts = db.prepare('SELECT COUNT(*) as count FROM products WHERE is_active = 1 AND stock_quantity > 0 AND stock_quantity <= min_stock_level').get().count;
     const outOfStockProducts = db.prepare('SELECT COUNT(*) as count FROM products WHERE is_active = 1 AND stock_quantity <= 0').get().count;
 
+    const lowStockList = db.prepare(`
+      SELECT id, name, sku, barcode, stock_quantity, min_stock_level
+      FROM products
+      WHERE is_active = 1 AND stock_quantity <= min_stock_level AND stock_quantity > 0
+      ORDER BY stock_quantity ASC
+      LIMIT 10
+    `).all();
+
+    const outOfStockList = db.prepare(`
+      SELECT id, name, sku, barcode, stock_quantity, min_stock_level
+      FROM products
+      WHERE is_active = 1 AND stock_quantity <= 0
+      ORDER BY stock_quantity ASC
+      LIMIT 10
+    `).all();
+
     // 3. Profit Margin Metrics
     const financialStats = db.prepare(`
       SELECT 
@@ -88,7 +104,9 @@ exports.getDashboardStats = (req, res) => {
       inventory: {
         totalProducts,
         lowStockProducts,
-        outOfStockProducts
+        outOfStockProducts,
+        lowStockList,
+        outOfStockList
       },
       profit: {
         totalRevenue,

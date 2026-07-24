@@ -15,6 +15,7 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const returnRoutes = require('./routes/returnRoutes');
 const backupRoutes = require('./routes/backupRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -43,6 +44,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Root & Health Check
 app.get('/', (req, res) => {

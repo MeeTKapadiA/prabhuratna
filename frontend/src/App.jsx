@@ -19,6 +19,7 @@ import ReturnsPage from './modules/returns/ReturnsPage';
 import ProfitMarginPage from './modules/profit/ProfitMarginPage';
 import ReportsPage from './modules/reports/ReportsPage';
 import UsersPage from './modules/users/UsersPage';
+import SettingsPage from './modules/settings/SettingsPage';
 import UnauthorizedPage from './modules/common/UnauthorizedPage';
 
 // Admin Role Protection Guard
@@ -94,6 +95,7 @@ export default function App() {
               <Route path="profit-margin" element={<RequireAdmin><ProfitMarginPage /></RequireAdmin>} />
               <Route path="reports" element={<RequireAdmin><ReportsPage /></RequireAdmin>} />
               <Route path="users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
+              <Route path="settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />
               <Route path="unauthorized" element={<UnauthorizedPage />} />
             </Route>
 

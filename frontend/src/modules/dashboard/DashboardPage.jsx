@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import StatCard from '../../components/ui/StatCard';
 import Badge from '../../components/ui/Badge';
 import { apiRequest } from '../../services/api';
@@ -133,6 +134,88 @@ export default function DashboardPage() {
           color="rose"
         />
       </div>
+
+      {/* Prominent Low & Out of Stock Alert Queue */}
+      {((inventory.outOfStockList && inventory.outOfStockList.length > 0) || (inventory.lowStockList && inventory.lowStockList.length > 0)) && (
+        <div className="glass-panel p-5 rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-white dark:bg-[#1E2126] space-y-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-[#F1F1F1]">
+                  Critical Stock Alerts & Reorder Queue
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">
+                  Products requiring immediate inventory restocking
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to="/app/inventory"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-all"
+            >
+              <Boxes className="w-4 h-4" /> Manage Inventory
+            </Link>
+          </div>
+
+          <div className="divide-y divide-slate-200 dark:divide-[#2D3138] border border-slate-200 dark:border-[#2D3138] rounded-xl overflow-hidden bg-[#FAFAF8] dark:bg-[#121417]">
+            {/* 1. Out of Stock Items First */}
+            {inventory.outOfStockList?.map((prod) => (
+              <div key={`out-${prod.id}`} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-rose-500/5 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Badge variant="danger">OUT OF STOCK</Badge>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1]">{prod.name}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku} {prod.barcode && `| Barcode: ${prod.barcode}`}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right text-xs">
+                    <span className="font-extrabold text-rose-600 dark:text-rose-400">Stock: {prod.stock_quantity}</span>
+                    <span className="text-slate-500 dark:text-[#9CA3AF]"> / Min: {prod.min_stock_level}</span>
+                  </div>
+                  <Link
+                    to="/app/inventory"
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#1E2126] border border-slate-300 dark:border-[#2D3138] hover:bg-slate-50 dark:hover:bg-[#2D3138] text-xs font-bold text-slate-800 dark:text-[#F1F1F1] transition-all shadow-xs"
+                  >
+                    Restock
+                  </Link>
+                </div>
+              </div>
+            ))}
+
+            {/* 2. Low Stock Items Next */}
+            {inventory.lowStockList?.map((prod) => (
+              <div key={`low-${prod.id}`} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-amber-500/5 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Badge variant="warning">LOW STOCK</Badge>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1]">{prod.name}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku} {prod.barcode && `| Barcode: ${prod.barcode}`}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right text-xs">
+                    <span className="font-extrabold text-amber-600 dark:text-amber-400">Stock: {prod.stock_quantity}</span>
+                    <span className="text-slate-500 dark:text-[#9CA3AF]"> / Min: {prod.min_stock_level}</span>
+                  </div>
+                  <Link
+                    to="/app/inventory"
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#1E2126] border border-slate-300 dark:border-[#2D3138] hover:bg-slate-50 dark:hover:bg-[#2D3138] text-xs font-bold text-slate-800 dark:text-[#F1F1F1] transition-all shadow-xs"
+                  >
+                    Restock
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Chart & Insights Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

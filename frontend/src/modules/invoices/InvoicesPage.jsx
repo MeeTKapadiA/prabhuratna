@@ -10,10 +10,12 @@ import StatCard from '../../components/ui/StatCard';
 import { apiRequest } from '../../services/api';
 import { formatCurrency } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
+import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
 import { Receipt, Eye, Printer, Phone, Mail, FileSpreadsheet, Calendar, DollarSign, CreditCard } from 'lucide-react';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
+  const [settings, setSettings] = useState({});
   const [search, setSearch] = useState('');
   const [paymentModeFilter, setPaymentModeFilter] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -49,6 +51,14 @@ export default function InvoicesPage() {
   useEffect(() => {
     fetchInvoices();
   }, [search, paymentModeFilter, startDate, endDate]);
+
+  useEffect(() => {
+    apiRequest('/settings').then((res) => {
+      if (res && res.success && res.settings) {
+        setSettings(res.settings);
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleOpenDetailModal = async (invoiceId) => {
     try {
@@ -267,11 +277,18 @@ export default function InvoicesPage() {
 
             {/* Modal Actions */}
             <div className="flex flex-wrap justify-between gap-2 pt-2">
-              <div className="flex gap-2">
-                <Button onClick={() => printInvoicePDF(selectedInvoice)} variant="secondary" icon={Printer}>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => shareOnWhatsApp('invoice', selectedInvoice, settings, (msg) => setToast({ isOpen: true, type: 'info', message: msg }))}
+                  className="bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                >
+                  <WhatsAppIcon className="w-4 h-4" /> Share on WhatsApp
+                </button>
+                <Button onClick={() => printInvoicePDF(selectedInvoice, settings)} variant="secondary" icon={Printer}>
                   Print Receipt
                 </Button>
-                <Button onClick={() => generateInvoicePDF(selectedInvoice)} variant="primary" icon={Printer}>
+                <Button onClick={() => generateInvoicePDF(selectedInvoice, { settings })} variant="primary" icon={Printer}>
                   Download PDF
                 </Button>
               </div>
