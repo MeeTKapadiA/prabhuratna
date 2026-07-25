@@ -62,7 +62,8 @@ exports.register = (req, res) => {
       return res.status(400).json({ success: false, message: 'Name, email and password are required' });
     }
 
-    const userRole = role === 'admin' ? 'admin' : 'staff';
+    // Public registration assigns 'staff' role by default. Admin user creation is handled via User Management.
+    const userRole = 'staff';
     const userUsername = username || email.split('@')[0];
 
     const existing = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, userUsername);

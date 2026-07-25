@@ -20,14 +20,29 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middlewares with production CORS support
-app.use(cors({
-  origin: true,
+app.disable('x-powered-by');
+
+// Dynamic CORS configuration supporting ALLOWED_ORIGINS env variable
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : null;
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow server-to-server or non-browser requests (no origin)
+    if (!origin) return callback(null, true);
+    if (!allowedOrigins || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS policy check failed: Origin not allowed'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-}));
-app.options('*', cors());
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 

@@ -303,7 +303,7 @@ function initDb() {
     insertSetting.run(key, val);
   }
 
-  // Seed default admin & staff users
+  // Seed default admin & staff users if not present
   const adminCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get('admin@prabhuratna.com', 'admin');
   if (!adminCheck) {
     const hashedAdminPass = bcrypt.hashSync('Admin@123', 10);
@@ -311,13 +311,6 @@ function initDb() {
       INSERT INTO users (name, username, email, password, role, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run('System Admin', 'admin', 'admin@prabhuratna.com', hashedAdminPass, 'admin', 'active');
-  } else {
-    const hashedAdminPass = bcrypt.hashSync('Admin@123', 10);
-    db.prepare(`
-      UPDATE users 
-      SET username = 'admin', password = ?, role = 'admin', status = 'active'
-      WHERE id = ?
-    `).run(hashedAdminPass, adminCheck.id);
   }
 
   const staffCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get('staff@prabhuratna.com', 'staff');
@@ -327,13 +320,6 @@ function initDb() {
       INSERT INTO users (name, username, email, password, role, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run('Store Staff', 'staff', 'staff@prabhuratna.com', hashedStaffPass, 'staff', 'active');
-  } else {
-    const hashedStaffPass = bcrypt.hashSync('Staff@123', 10);
-    db.prepare(`
-      UPDATE users 
-      SET username = 'staff', password = ?, role = 'staff', status = 'active'
-      WHERE id = ?
-    `).run(hashedStaffPass, staffCheck.id);
   }
 
   // Seed default demo products if empty

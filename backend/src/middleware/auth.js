@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.warn('[SECURITY WARNING] JWT_SECRET is not set in environment variables! Using fallback secret key in production is unsafe. Please set JWT_SECRET in your production environment settings.');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'prabhuratna_secret_key_2026';
 
 function authenticateToken(req, res, next) {
