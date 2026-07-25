@@ -25,14 +25,22 @@ export default function ReportsPage() {
   const fetchReport = async () => {
     setIsLoading(true);
     try {
-      let endpoint = `/reports/${reportType}?`;
-      if (startDate) endpoint += `startDate=${startDate}&`;
-      if (endDate) endpoint += `endDate=${endDate}&`;
+      if (reportType === 'reconciliation') {
+        const res = await apiRequest('/inventory/reconciliation');
+        if (res.success) {
+          setReportData(res.report || []);
+          setSummary({ totalProducts: res.total_products, discrepancies: res.discrepancy_count });
+        }
+      } else {
+        let endpoint = `/reports/${reportType}?`;
+        if (startDate) endpoint += `startDate=${startDate}&`;
+        if (endDate) endpoint += `endDate=${endDate}&`;
 
-      const res = await apiRequest(endpoint);
-      if (res.success) {
-        setReportData(res.sales || res.inventory || res.profitData || []);
-        setSummary(res.summary);
+        const res = await apiRequest(endpoint);
+        if (res.success) {
+          setReportData(res.sales || res.inventory || res.profitData || []);
+          setSummary(res.summary);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -136,6 +144,25 @@ export default function ReportsPage() {
         { header: 'Cost Valuation', render: (row) => formatCurrency(row.cost_value) },
         { header: 'Retail Valuation', render: (row) => <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{formatCurrency(row.retail_value)}</span> }
       ];
+    } else if (reportType === 'reconciliation') {
+      return [
+        { header: 'Product Name', accessor: 'name' },
+        { header: 'SKU / Barcode', render: (row) => <span className="font-mono text-xs">{row.sku}</span> },
+        { header: 'Purchased (+)', accessor: 'total_purchased' },
+        { header: 'Returned (+)', accessor: 'total_returned' },
+        { header: 'Manual Adj (±)', accessor: 'manual_adjustments' },
+        { header: 'Sold (-)', accessor: 'total_sold' },
+        { header: 'Calc Stock', render: (row) => <span className="font-bold">{row.calculated_stock}</span> },
+        { header: 'System Stock', render: (row) => <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{row.current_stock}</span> },
+        {
+          header: 'Audit Status',
+          render: (row) => (
+            <Badge variant={row.discrepancy === 0 ? 'success' : 'danger'}>
+              {row.discrepancy === 0 ? 'BALANCED' : `DIFF: ${row.discrepancy > 0 ? '+' : ''}${row.discrepancy}`}
+            </Badge>
+          )
+        }
+      ];
     } else {
       return [
         { header: 'Product Name', accessor: 'product_name' },
@@ -217,6 +244,7 @@ export default function ReportsPage() {
             <option value="sales">Sales & Revenue Report</option>
             <option value="inventory">Inventory Stock Valuation Report</option>
             <option value="profit">Product Profitability Report</option>
+            <option value="reconciliation">Stock Audit & Reconciliation Report</option>
           </select>
         </div>
 

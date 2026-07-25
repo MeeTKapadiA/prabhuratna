@@ -14,132 +14,151 @@ import {
   Building2
 } from 'lucide-react';
 
-export const NAV_ITEMS = [
+export const NAV_SECTIONS = [
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    path: '/app/dashboard',
-    icon: LayoutDashboard,
-    module: 'dashboard',
-    adminOnly: true,
-    priority: 1
+    id: 'main',
+    title: null, // Top-level item without section header
+    items: [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        path: '/app/dashboard',
+        icon: LayoutDashboard,
+        module: 'dashboard',
+        adminOnly: true
+      }
+    ]
   },
   {
-    id: 'billing',
-    label: 'POS Billing',
-    path: '/app/billing',
-    icon: ShoppingCart,
-    module: 'billing',
-    priority: 2
+    id: 'sales',
+    title: 'Sales & Billing',
+    items: [
+      {
+        id: 'billing',
+        label: 'POS Billing',
+        path: '/app/billing',
+        icon: ShoppingCart,
+        module: 'billing'
+      },
+      {
+        id: 'invoices',
+        label: 'Customer Invoices',
+        path: '/app/invoices',
+        icon: Receipt,
+        module: 'invoices'
+      },
+      {
+        id: 'quotations',
+        label: 'Quotations',
+        path: '/app/quotations',
+        icon: FileText,
+        module: 'billing'
+      },
+      {
+        id: 'returns',
+        label: 'Returns & Exchanges',
+        path: '/app/returns',
+        icon: RotateCcw,
+        module: 'returns'
+      }
+    ]
   },
   {
-    id: 'invoices',
-    label: 'Customer Invoices',
-    path: '/app/invoices',
-    icon: Receipt,
-    module: 'invoices',
-    priority: 3
+    id: 'stock',
+    title: 'Inventory & Stock',
+    items: [
+      {
+        id: 'products',
+        label: 'Products',
+        path: '/app/products',
+        icon: Package,
+        module: 'products'
+      },
+      {
+        id: 'inventory',
+        label: 'Inventory Track',
+        path: '/app/inventory',
+        icon: Boxes,
+        module: 'inventory'
+      },
+      {
+        id: 'purchases',
+        label: 'Purchases',
+        path: '/app/purchases',
+        icon: ShoppingBag,
+        module: 'purchases'
+      },
+      {
+        id: 'suppliers',
+        label: 'Suppliers',
+        path: '/app/suppliers',
+        icon: Truck,
+        module: 'suppliers'
+      }
+    ]
   },
   {
-    id: 'products',
-    label: 'Products',
-    path: '/app/products',
-    icon: Package,
-    module: 'products',
-    priority: 4
-  },
-  {
-    id: 'suppliers',
-    label: 'Suppliers',
-    path: '/app/suppliers',
-    icon: Truck,
-    module: 'suppliers',
-    priority: 5
-  },
-  {
-    id: 'purchases',
-    label: 'Purchases',
-    path: '/app/purchases',
-    icon: ShoppingBag,
-    module: 'purchases',
-    priority: 6
-  },
-  {
-    id: 'returns',
-    label: 'Returns & Exchanges',
-    path: '/app/returns',
-    icon: RotateCcw,
-    module: 'returns',
-    priority: 7
-  },
-  {
-    id: 'quotations',
-    label: 'Quotations',
-    path: '/app/quotations',
-    icon: FileText,
-    module: 'billing',
-    priority: 8
-  },
-  {
-    id: 'inventory',
-    label: 'Inventory Track',
-    path: '/app/inventory',
-    icon: Boxes,
-    module: 'inventory',
-    priority: 9
-  },
-  {
-    id: 'profit',
-    label: 'Profit Analytics',
-    path: '/app/profit-margin',
-    icon: TrendingUp,
-    module: 'reports',
-    adminOnly: true,
-    priority: 10
-  },
-  {
-    id: 'reports',
-    label: 'Reports & Export',
-    path: '/app/reports',
-    icon: BarChart3,
-    module: 'reports',
-    adminOnly: true,
-    priority: 11
-  },
-  {
-    id: 'users',
-    label: 'User Management',
-    path: '/app/users',
-    icon: Users,
-    module: 'users',
-    adminOnly: true,
-    priority: 12
-  },
-  {
-    id: 'settings',
-    label: 'Business Settings',
-    path: '/app/settings',
-    icon: Building2,
-    module: 'settings',
-    adminOnly: true,
-    priority: 13
+    id: 'admin',
+    title: 'Admin & Analytics',
+    items: [
+      {
+        id: 'reports',
+        label: 'Reports & Export',
+        path: '/app/reports',
+        icon: BarChart3,
+        module: 'reports',
+        adminOnly: true
+      },
+      {
+        id: 'profit',
+        label: 'Profit Analytics',
+        path: '/app/profit-margin',
+        icon: TrendingUp,
+        module: 'reports',
+        adminOnly: true
+      },
+      {
+        id: 'users',
+        label: 'User Management',
+        path: '/app/users',
+        icon: Users,
+        module: 'users',
+        adminOnly: true
+      },
+      {
+        id: 'settings',
+        label: 'Business Settings',
+        path: '/app/settings',
+        icon: Building2,
+        module: 'settings',
+        adminOnly: true
+      }
+    ]
   }
 ];
 
-export function getAccessibleNavItems(user, hasPermission) {
+export function getAccessibleNavSections(user, hasPermission) {
   if (!user) return [];
   const isAdmin = user.role === 'admin';
-  return NAV_ITEMS.filter((item) => {
-    if (isAdmin) return true;
-    if (item.adminOnly) return false;
-    return hasPermission ? hasPermission(item.module, 'view') : true;
-  });
+
+  return NAV_SECTIONS.map((section) => {
+    const accessibleItems = section.items.filter((item) => {
+      if (isAdmin) return true;
+      if (item.adminOnly) return false;
+      return hasPermission ? hasPermission(item.module, 'view') : true;
+    });
+
+    return {
+      ...section,
+      items: accessibleItems
+    };
+  }).filter((section) => section.items.length > 0);
 }
 
 export function getDefaultRouteForUser(user, hasPermission) {
-  const accessible = getAccessibleNavItems(user, hasPermission);
-  if (accessible.length > 0) {
-    return accessible[0].path;
+  const sections = getAccessibleNavSections(user, hasPermission);
+  if (sections.length > 0 && sections[0].items.length > 0) {
+    return sections[0].items[0].path;
   }
   return '/app/billing';
 }

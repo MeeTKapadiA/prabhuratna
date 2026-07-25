@@ -7,5 +7,6 @@ router.post('/adjust', authenticateToken, inventoryController.adjustStock);
 router.get('/logs', authenticateToken, inventoryController.getInventoryLogs);
 router.get('/fast-moving', authenticateToken, inventoryController.getFastMovingProducts);
 router.get('/slow-moving', authenticateToken, inventoryController.getSlowMovingProducts);
+router.get('/reconciliation', authenticateToken, inventoryController.getReconciliationReport);
 
 module.exports = router;

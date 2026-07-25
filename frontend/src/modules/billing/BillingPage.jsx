@@ -323,7 +323,8 @@ export default function BillingPage() {
             </div>
 
             <div className="overflow-x-auto max-h-[50vh] overflow-y-auto">
-              <table className="w-full text-left text-xs text-slate-900 dark:text-[#F1F1F1]">
+              {/* Desktop Table View (>= md) */}
+              <table className="hidden md:table w-full text-left text-xs text-slate-900 dark:text-[#F1F1F1]">
                 <thead className="bg-[#FAFAF8] dark:bg-[#121417] text-slate-500 dark:text-[#9CA3AF] border-b border-slate-200 dark:border-[#2D3138]">
                   <tr>
                     <th className="px-4 py-3">Product Name & SKU</th>
@@ -360,14 +361,14 @@ export default function BillingPage() {
                             <div className="inline-flex items-center gap-1.5 border border-slate-300 dark:border-[#2D3138] rounded-xl p-1 bg-white dark:bg-[#121417]">
                               <button
                                 onClick={() => updateQuantity(idx, item.quantity - 1)}
-                                className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF]"
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF] cursor-pointer"
                               >
                                 <Minus className="w-3 h-3" />
                               </button>
                               <span className="w-6 font-bold text-center text-slate-900 dark:text-[#F1F1F1]">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(idx, item.quantity + 1)}
-                                className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF]"
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF] cursor-pointer"
                               >
                                 <Plus className="w-3 h-3" />
                               </button>
@@ -395,7 +396,7 @@ export default function BillingPage() {
                           <td className="px-3 py-3 text-center">
                             <button
                               onClick={() => removeFromCart(idx)}
-                              className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                              className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -406,6 +407,88 @@ export default function BillingPage() {
                   )}
                 </tbody>
               </table>
+
+              {/* Mobile Card Touch View (< md) */}
+              <div className="block md:hidden divide-y divide-slate-200 dark:divide-[#2D3138]">
+                {cartItems.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 dark:text-[#9CA3AF]">
+                    <ScanBarcode className="w-10 h-10 mx-auto mb-2 text-slate-400 animate-bounce" />
+                    <p className="font-bold text-slate-800 dark:text-[#F1F1F1] text-sm">Cart is Empty</p>
+                    <p className="text-xs text-slate-500 mt-1">Scan barcode or tap "Search Catalog" above</p>
+                  </div>
+                ) : (
+                  cartItems.map((item, idx) => (
+                    <div key={idx} className="p-3.5 space-y-3 bg-white dark:bg-[#1E2126]">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.product_name}</h4>
+                          <p className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">SKU: {item.sku}</p>
+                        </div>
+                        <button
+                          onClick={() => removeFromCart(idx)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 rounded-xl bg-slate-50 dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138]">
+                          <span className="text-[10px] text-slate-500 block">Unit Rate</span>
+                          <span className="font-bold text-slate-900 dark:text-[#F1F1F1]">{formatCurrency(item.unit_price)}</span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-slate-50 dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138]">
+                          <span className="text-[10px] text-slate-500 block">Item Total</span>
+                          <span className="font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(item.unit_price * item.quantity)}</span>
+                        </div>
+                      </div>
+
+                      {/* Mobile Touch Controls Row */}
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase mr-1">Qty:</span>
+                          <div className="inline-flex items-center border border-slate-300 dark:border-[#2D3138] rounded-xl p-1 bg-white dark:bg-[#121417]">
+                            <button
+                              onClick={() => updateQuantity(idx, item.quantity - 1)}
+                              className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-700 dark:text-[#F1F1F1]"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="w-7 font-bold text-center text-sm text-slate-900 dark:text-[#F1F1F1]">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(idx, item.quantity + 1)}
+                              className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-700 dark:text-[#F1F1F1]"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Disc %</span>
+                            <input
+                              type="number"
+                              value={item.discount_percent}
+                              onChange={(e) => updateDiscount(idx, e.target.value)}
+                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">GST %</span>
+                            <input
+                              type="number"
+                              value={item.gst_percent}
+                              onChange={(e) => updateGst(idx, e.target.value)}
+                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>

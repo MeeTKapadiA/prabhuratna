@@ -125,3 +125,48 @@ exports.getSlowMovingProducts = (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to fetch slow moving analytics' });
   }
 };
+
+exports.getReconciliationReport = (req, res) => {
+  try {
+    const products = db.prepare(`
+      SELECT 
+        p.id,
+        p.name,
+        p.sku,
+        p.barcode,
+        p.category,
+        p.stock_quantity as current_stock,
+        COALESCE((SELECT SUM(ii.quantity) FROM invoice_items ii WHERE ii.product_id = p.id), 0) as total_sold,
+        COALESCE((SELECT SUM(pi.quantity) FROM purchase_items pi WHERE pi.product_id = p.id), 0) as total_purchased,
+        COALESCE((SELECT SUM(ri.quantity) FROM return_items ri WHERE ri.product_id = p.id AND ri.is_damaged = 0), 0) as total_returned,
+        COALESCE((SELECT SUM(l.quantity_change) FROM inventory_logs l WHERE l.product_id = p.id AND l.change_type = 'MANUAL_ADJUSTMENT'), 0) as manual_adjustments
+      FROM products p
+      WHERE p.is_active = 1
+      ORDER BY p.name ASC
+    `).all();
+
+    const reconciliationList = products.map((prod) => {
+      const calculatedStock = prod.total_purchased + prod.total_returned + prod.manual_adjustments - prod.total_sold;
+      const discrepancy = prod.current_stock - calculatedStock;
+
+      return {
+        ...prod,
+        calculated_stock: calculatedStock,
+        discrepancy,
+        status: discrepancy === 0 ? 'BALANCED' : 'DISCREPANCY'
+      };
+    });
+
+    const totalDiscrepancies = reconciliationList.filter(p => p.status === 'DISCREPANCY').length;
+
+    return res.json({
+      success: true,
+      total_products: reconciliationList.length,
+      discrepancy_count: totalDiscrepancies,
+      report: reconciliationList
+    });
+  } catch (error) {
+    console.error('Error loading reconciliation report:', error);
+    return res.status(500).json({ success: false, message: 'Failed to generate stock reconciliation report' });
+  }
+};

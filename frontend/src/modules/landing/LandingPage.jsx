@@ -205,9 +205,9 @@ export default function LandingPage() {
               category: catKey,
               categoryName: catName,
               tag: p.brand || 'Featured',
-              image: p.image || img,
-              desc: p.description || `${p.name} - Premium quality item available at Prabhuratna Metals.`,
-              features: [`SKU: ${p.sku || 'N/A'}`, `GST: ${p.gst_rate}%`, 'In Stock at Store'],
+              image: p.image_url || img,
+              desc: `${p.name} - Premium quality item available at Prabhuratna Metals.`,
+              features: [`SKU: ${p.sku || 'N/A'}`, `GST: ${p.gst_percent || 18}%`, p.stock_quantity > 0 ? 'In Stock at Store' : 'Available on Order'],
               priceText: p.selling_price ? formatCurrency(p.selling_price) : 'Wholesale Rate',
               brands: p.brand || 'Prabhuratna'
             };
