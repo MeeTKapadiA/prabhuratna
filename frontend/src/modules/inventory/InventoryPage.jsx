@@ -9,7 +9,7 @@ import SearchBar from '../../components/ui/SearchBar';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
 import { formatCurrency } from '../../services/calcService';
-import { Boxes, ArrowUpDown, AlertTriangle, TrendingUp, TrendingDown, Plus, Minus, History, QrCode, RefreshCw } from 'lucide-react';
+import { Boxes, ArrowUpDown, AlertTriangle, TrendingUp, TrendingDown, Plus, Minus, History, QrCode, RefreshCw, Printer } from 'lucide-react';
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState('stock'); // 'stock', 'fast', 'slow', 'logs'

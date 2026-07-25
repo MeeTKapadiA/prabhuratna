@@ -28,8 +28,6 @@ import {
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Modals state
@@ -54,10 +52,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      let query = `/users?search=${encodeURIComponent(search)}`;
-      if (roleFilter) query += `&role=${roleFilter}`;
-      if (statusFilter) query += `&status=${statusFilter}`;
-      const res = await apiRequest(query);
+      const res = await apiRequest(`/users?search=${encodeURIComponent(search)}`);
       if (res.success) {
         setUsers(res.users);
       }
@@ -71,7 +66,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, [search, roleFilter, statusFilter]);
+  }, [search]);
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -315,9 +310,9 @@ export default function UsersPage() {
         />
       </div>
 
-      {/* Filter Controls Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="sm:col-span-2">
+      {/* Right-Aligned Search Control Bar */}
+      <div className="flex justify-end">
+        <div className="w-full sm:w-80">
           <SearchBar
             value={search}
             onChange={setSearch}
@@ -325,26 +320,6 @@ export default function UsersPage() {
             placeholder="Search user by name, username or email..."
           />
         </div>
-
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-xs text-slate-900 dark:text-[#F1F1F1] focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C]"
-        >
-          <option value="">All Roles</option>
-          <option value="admin">System Admin</option>
-          <option value="staff">Store Staff</option>
-        </select>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-xs text-slate-900 dark:text-[#F1F1F1] focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C]"
-        >
-          <option value="">All Account Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Deactivated</option>
-        </select>
       </div>
 
       {/* Users Data Table */}

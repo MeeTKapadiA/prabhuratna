@@ -3,29 +3,73 @@ import { MoreVertical } from 'lucide-react';
 
 export default function TableActionsMenu({ actions = [] }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef(null);
   const menuRef = useRef(null);
 
+  const calculatePosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const visibleActionsCount = actions.filter((a) => !a.hidden).length;
+      const estimatedMenuHeight = visibleActionsCount * 38 + 16;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      let top = rect.bottom + 6;
+      if (spaceBelow < estimatedMenuHeight && rect.top > estimatedMenuHeight) {
+        top = rect.top - estimatedMenuHeight - 6;
+      }
+
+      const left = Math.min(Math.max(10, rect.left), window.innerWidth - 200);
+
+      setMenuPosition({ top, left });
+    }
+  };
+
+  const handleToggle = (e) => {
+    e.stopPropagation();
+    if (!isOpen) {
+      calculatePosition();
+    }
+    setIsOpen((prev) => !prev);
+  };
+
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+    function handleScrollOrClickOutside(event) {
+      if (
+        isOpen &&
+        menuRef.current &&
+        !menuRef.current.contains(event.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target)
+      ) {
         setIsOpen(false);
       }
     }
+
+    function handleScroll() {
+      if (isOpen) {
+        setIsOpen(false);
+      }
+    }
+
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('mousedown', handleScrollOrClickOutside);
+      window.addEventListener('scroll', handleScroll, true);
     }
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', handleScrollOrClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [isOpen]);
 
   if (!actions || actions.length === 0) return null;
 
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
+    <div className="inline-block text-left">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={handleToggle}
         className="p-1.5 rounded-lg border border-slate-300 dark:border-[#2D3138] hover:bg-slate-100 dark:hover:bg-[#1E2126] text-slate-600 dark:text-[#F1F1F1] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center justify-center"
         aria-label="Actions Menu"
       >
@@ -33,7 +77,11 @@ export default function TableActionsMenu({ actions = [] }) {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-1 w-48 rounded-xl bg-white dark:bg-[#1E2126] border border-slate-200 dark:border-[#2D3138] shadow-xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100 dark:divide-[#2D3138]/60">
+        <div
+          ref={menuRef}
+          style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+          className="fixed w-48 rounded-xl bg-white dark:bg-[#1E2126] border border-slate-200 dark:border-[#2D3138] shadow-2xl z-[9999] py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100 dark:divide-[#2D3138]/60"
+        >
           <div className="py-1">
             {actions.map((act, idx) => {
               if (act.hidden) return null;

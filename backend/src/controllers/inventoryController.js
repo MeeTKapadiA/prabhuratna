@@ -70,13 +70,17 @@ exports.getFastMovingProducts = (req, res) => {
     const query = `
       SELECT 
         ii.product_id,
-        ii.product_name,
+        COALESCE(p.name, ii.product_name) as name,
+        COALESCE(p.category, 'General') as category,
+        COALESCE(p.stock_quantity, 0) as stock_quantity,
         ii.barcode,
         SUM(ii.quantity) as total_quantity_sold,
+        SUM(ii.quantity) as total_units_sold,
         SUM(ii.total_price) as total_revenue,
         COUNT(DISTINCT ii.invoice_id) as total_transactions
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
+      LEFT JOIN products p ON ii.product_id = p.id
       WHERE DATE(i.created_at) >= DATE('now', '-' || ? || ' days')
       GROUP BY ii.product_id, ii.product_name
       ORDER BY total_quantity_sold DESC
@@ -105,6 +109,7 @@ exports.getSlowMovingProducts = (req, res) => {
         p.brand,
         p.stock_quantity,
         p.min_stock_level,
+        p.purchase_price,
         p.selling_price,
         (p.stock_quantity * p.purchase_price) as inventory_value,
         COALESCE(SUM(ii.quantity), 0) as sales_in_period

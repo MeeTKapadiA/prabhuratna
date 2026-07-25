@@ -4,13 +4,36 @@ const bcrypt = require('bcryptjs');
 // Get all users
 exports.getAllUsers = (req, res) => {
   try {
-    const users = db.prepare(`
+    const { search, role, status } = req.query;
+
+    let query = `
       SELECT id, name, username, email, role, status, last_login, created_at
       FROM users
-      ORDER BY created_at DESC
-    `).all();
+      WHERE 1=1
+    `;
+    const params = [];
 
-    return res.json({ success: true, users });
+    if (search) {
+      query += ` AND (name LIKE ? OR username LIKE ? OR email LIKE ?)`;
+      const term = `%${search}%`;
+      params.push(term, term, term);
+    }
+
+    if (role) {
+      query += ` AND role = ?`;
+      params.push(role);
+    }
+
+    if (status) {
+      query += ` AND status = ?`;
+      params.push(status);
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const users = db.prepare(query).all(...params);
+
+    return res.json({ success: true, count: users.length, users });
   } catch (error) {
     console.error('Error fetching users:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching users list' });

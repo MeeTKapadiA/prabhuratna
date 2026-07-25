@@ -10,7 +10,7 @@ import StatCard from '../../components/ui/StatCard';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
 import { formatCurrency, formatDate } from '../../services/calcService';
-import { Plus, Edit2, Trash2, Truck, Phone, Mail, MapPin, DollarSign, History, Receipt } from 'lucide-react';
+import { Plus, Edit2, Trash2, Truck, Phone, Mail, MapPin, DollarSign, History, Receipt, Building2, Wallet, CreditCard } from 'lucide-react';
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState([]);
@@ -264,7 +264,8 @@ export default function SuppliersPage() {
       <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
         <SearchBar
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
+          onClear={() => setSearch('')}
           placeholder="Search by supplier name, phone, email or GST..."
         />
       </div>
