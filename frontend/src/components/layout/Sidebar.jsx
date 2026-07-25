@@ -43,8 +43,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed }) {
         `}
       >
         <div className="p-3 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
-          <div className="flex items-center justify-between px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#9CA3AF]">
-            {!isCollapsed && <span>POS Navigation</span>}
+          <div className="flex items-center justify-end px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#9CA3AF]">
             <button onClick={onClose} className="lg:hidden p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white">
               <X className="w-4 h-4" />
             </button>

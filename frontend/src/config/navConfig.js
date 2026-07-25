@@ -35,7 +35,7 @@ export const NAV_SECTIONS = [
     items: [
       {
         id: 'billing',
-        label: 'POS Billing',
+        label: 'Billing',
         path: '/app/billing',
         icon: ShoppingCart,
         module: 'billing'
