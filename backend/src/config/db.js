@@ -275,6 +275,32 @@ function initDb() {
     );
   `);
 
+  // Categories Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Seed default categories if empty
+  const defaultCategories = [
+    'Cookware',
+    'Dinnerware',
+    'Appliances',
+    'Drinkware',
+    'Gift Sets',
+    'Cutlery',
+    'General'
+  ];
+
+  const insertCategory = db.prepare(`
+    INSERT INTO categories (name) VALUES (?)
+    ON CONFLICT(name) DO NOTHING
+  `);
+  defaultCategories.forEach(cat => insertCategory.run(cat));
+
   // Migrations wrapped in try/catch
   try {
     db.exec(`ALTER TABLE return_items ADD COLUMN is_damaged INTEGER DEFAULT 0`);

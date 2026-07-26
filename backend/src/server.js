@@ -16,6 +16,7 @@ const purchaseRoutes = require('./routes/purchaseRoutes');
 const returnRoutes = require('./routes/returnRoutes');
 const backupRoutes = require('./routes/backupRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -50,6 +51,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/invoices', billingRoutes);
 app.use('/api/quotations', quotationRoutes);

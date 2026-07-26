@@ -24,7 +24,7 @@ import {
   Camera,
   ShoppingBag
 } from 'lucide-react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import BarcodeCameraScannerModal from '../../components/ui/BarcodeCameraScannerModal';
 
 export default function BillingPage() {
   const [cartItems, setCartItems] = useState([]);
@@ -64,21 +64,59 @@ export default function BillingPage() {
   // Hardware Barcode Gun Listener - Instant Auto Add
   useEffect(() => {
     const cleanup = setupBarcodeScanner((scannedBarcode) => {
-      fetchProductByBarcode(scannedBarcode);
+      handleSmartScan(scannedBarcode);
     });
     return cleanup;
   }, [cartItems]);
 
-  const fetchProductByBarcode = async (barcode) => {
+  // Smart QR & Barcode Auto-Add Handler
+  const handleSmartScan = async (scannedText) => {
+    if (!scannedText) return false;
+    let targetCode = String(scannedText).trim();
+
+    // 1. Parse JSON Smart QR payload (e.g. {"barcode": "...", "sku": "...", "id": 12})
     try {
-      const res = await apiRequest(`/products/barcode/${barcode}`);
+      if (targetCode.startsWith('{') && targetCode.endsWith('}')) {
+        const parsed = JSON.parse(targetCode);
+        if (parsed.barcode) targetCode = String(parsed.barcode);
+        else if (parsed.sku) targetCode = String(parsed.sku);
+        else if (parsed.id || parsed.product_id) targetCode = String(parsed.id || parsed.product_id);
+      }
+    } catch (e) {}
+
+    // 2. Clean URL or prefixes if present (e.g. http://.../products/890745951663 or PROD:890745951663)
+    if (targetCode.includes('http://') || targetCode.includes('https://')) {
+      const parts = targetCode.split('/');
+      targetCode = parts[parts.length - 1] || targetCode;
+    }
+    targetCode = targetCode.replace(/^(BARCODE|SKU|PROD|ITEM):/i, '');
+
+    // 3. Direct lookup by Barcode
+    try {
+      const res = await apiRequest(`/products/barcode/${encodeURIComponent(targetCode)}`);
       if (res.success && res.product) {
         addToCart(res.product);
-        showToast(`Barcode Scanned: ${res.product.name} auto-filled!`, 'success');
+        showToast(`⚡ Scanned: ${res.product.name} auto-added to cart!`, 'success');
+        return true;
       }
-    } catch (err) {
-      showToast(`Product not found for barcode: ${barcode}`, 'error');
-    }
+    } catch (err) {}
+
+    // 4. Fallback search by SKU or Product Search
+    try {
+      const res = await apiRequest(`/products?search=${encodeURIComponent(targetCode)}&activeOnly=true`);
+      if (res.success && res.products && res.products.length > 0) {
+        const match = res.products.find(
+          (p) => String(p.sku) === targetCode || String(p.barcode) === targetCode || String(p.id) === targetCode
+        ) || res.products[0];
+
+        addToCart(match);
+        showToast(`⚡ Scanned: ${match.name} auto-added to cart!`, 'success');
+        return true;
+      }
+    } catch (err) {}
+
+    showToast(`Product not found for scanned code: "${targetCode}"`, 'error');
+    return false;
   };
 
   // Search Products for Manual Add
@@ -99,26 +137,6 @@ export default function BillingPage() {
       setSearchResults([]);
     }
   }, [manualSearch]);
-
-  // Camera Scanner Setup
-  useEffect(() => {
-    let scanner = null;
-    if (isCameraScannerOpen) {
-      scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-      scanner.render((decodedText) => {
-        fetchProductByBarcode(decodedText);
-        setIsCameraScannerOpen(false);
-        scanner.clear();
-      }, (error) => {
-        // ignore scan errors
-      });
-    }
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(() => {});
-      }
-    };
-  }, [isCameraScannerOpen]);
 
   const addToCart = (product) => {
     setCartItems((prev) => {
@@ -293,10 +311,10 @@ export default function BillingPage() {
               <input
                 id="barcode-scanner-input"
                 type="text"
-                placeholder="Ready for USB/Bluetooth Barcode Scan... (Hit Enter)"
+                placeholder="Ready for USB/Bluetooth Barcode or Smart QR Scan... (Hit Enter)"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.target.value.trim()) {
-                    fetchProductByBarcode(e.target.value.trim());
+                    handleSmartScan(e.target.value.trim());
                     e.target.value = '';
                   }
                 }}
@@ -652,18 +670,12 @@ export default function BillingPage() {
         </div>
       </Modal>
 
-      {/* Camera Barcode Scanner Modal */}
-      <Modal
+      {/* Live Mobile Camera Barcode & Smart QR Scanner Modal */}
+      <BarcodeCameraScannerModal
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
-        title="Webcam Barcode Scanner"
-        subtitle="Point device camera at 1D Barcode label to scan item into bill"
-      >
-        <div className="space-y-4 text-center">
-          <div id="reader" className="w-full max-w-sm mx-auto overflow-hidden rounded-xl border border-slate-200 dark:border-[#2D3138]"></div>
-          <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Position barcode clearly within box frame</p>
-        </div>
-      </Modal>
+        onScanSuccess={(decodedText) => handleSmartScan(decodedText)}
+      />
 
       {/* Post Checkout Completed Invoice Modal */}
       <Modal

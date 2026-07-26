@@ -10,10 +10,11 @@ import BarcodeGenerator from '../../components/ui/BarcodeGenerator';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
 import { formatCurrency, formatDate } from '../../services/calcService';
-import { Plus, Edit2, Trash2, Package, ScanBarcode, RefreshCw, QrCode, Globe, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, ScanBarcode, RefreshCw, QrCode, Globe, Eye, EyeOff, Upload, X, Image as ImageIcon, Tag } from 'lucide-react';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +22,14 @@ export default function ProductsPage() {
   // Form Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   
+  // Category Management Modal State
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+
   // Barcode Viewer Modal State
   const [selectedBarcodeProd, setSelectedBarcodeProd] = useState(null);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
@@ -39,7 +47,8 @@ export default function ProductsPage() {
     gst_percent: '18',
     stock_quantity: '10',
     min_stock_level: '5',
-    show_on_website: true
+    image_url: '',
+    show_on_website: false
   });
 
   const [toast, setToast] = useState({ isOpen: false, type: 'info', message: '' });
@@ -60,12 +69,77 @@ export default function ProductsPage() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const res = await apiRequest('/categories');
+      if (res.success && res.categories) {
+        setCategories(res.categories);
+      }
+    } catch (err) {
+      console.error('Failed to load categories', err);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, [search, stockFilter]);
+
+  const handleAddCategorySubmit = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await apiRequest('/categories', 'POST', { name: newCategoryName.trim() });
+      if (res.success) {
+        setToast({ isOpen: true, type: 'success', message: 'Category created successfully!' });
+        setNewCategoryName('');
+        fetchCategories();
+      }
+    } catch (err) {
+      setToast({ isOpen: true, type: 'error', message: err.message || 'Failed to create category' });
+    }
+  };
+
+  const handleStartEditCategory = (cat) => {
+    setEditingCategoryId(cat.id);
+    setEditingCategoryName(cat.name);
+  };
+
+  const handleUpdateCategorySubmit = async (catId) => {
+    if (!editingCategoryName.trim()) return;
+    try {
+      const res = await apiRequest(`/categories/${catId}`, 'PUT', { name: editingCategoryName.trim() });
+      if (res.success) {
+        setToast({ isOpen: true, type: 'success', message: 'Category updated successfully!' });
+        setEditingCategoryId(null);
+        setEditingCategoryName('');
+        fetchCategories();
+        fetchProducts();
+      }
+    } catch (err) {
+      setToast({ isOpen: true, type: 'error', message: err.message || 'Failed to update category' });
+    }
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    if (!cat.id) return;
+    if (window.confirm(`Delete category "${cat.name}"? Products using this category will be reassigned to "General".`)) {
+      try {
+        const res = await apiRequest(`/categories/${cat.id}`, 'DELETE');
+        if (res.success) {
+          setToast({ isOpen: true, type: 'success', message: 'Category deleted' });
+          fetchCategories();
+          fetchProducts();
+        }
+      } catch (err) {
+        setToast({ isOpen: true, type: 'error', message: err.message || 'Failed to delete category' });
+      }
+    }
+  };
 
   const handleOpenAddModal = () => {
     setEditingId(null);
+    setIsCustomCategory(false);
     setFormData({
       name: '',
       barcode: `890${Date.now().toString().slice(-9)}`,
@@ -78,13 +152,18 @@ export default function ProductsPage() {
       gst_percent: '18',
       stock_quantity: '10',
       min_stock_level: '5',
-      show_on_website: true
+      image_url: '',
+      show_on_website: false
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (prod) => {
     setEditingId(prod.id);
+    const standardCategories = ['Cookware', 'Dinnerware', 'Appliances', 'Drinkware', 'Gift Sets', 'Cutlery', 'General'];
+    const isCustom = !standardCategories.includes(prod.category);
+    setIsCustomCategory(isCustom);
+
     setFormData({
       name: prod.name,
       barcode: prod.barcode || '',
@@ -97,9 +176,26 @@ export default function ProductsPage() {
       gst_percent: prod.gst_percent,
       stock_quantity: prod.stock_quantity,
       min_stock_level: prod.min_stock_level,
+      image_url: prod.image_url || '',
       show_on_website: prod.show_on_website === 1
     });
     setIsModalOpen(true);
+  };
+
+  const handleImageFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setToast({ isOpen: true, type: 'error', message: 'Product image file size must be less than 5MB' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({ ...prev, image_url: reader.result }));
+        setToast({ isOpen: true, type: 'success', message: 'Product image attached successfully!' });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -183,14 +279,27 @@ export default function ProductsPage() {
       accessor: 'name',
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 flex-shrink-0">
-            <Package className="w-5 h-5" />
-          </div>
+          {row.image_url ? (
+            <img src={row.image_url} alt={row.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-[#2D3138] flex-shrink-0" />
+          ) : (
+            <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 flex-shrink-0">
+              <Package className="w-5 h-5" />
+            </div>
+          )}
           <div>
             <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.name}</p>
-            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Category: {row.category} | Brand: {row.brand}</p>
+            <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Brand: {row.brand}</p>
           </div>
         </div>
+      )
+    },
+    {
+      header: 'Category',
+      accessor: 'category',
+      render: (row) => (
+        <span className="px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
+          {row.category || 'General'}
+        </span>
       )
     },
     {
@@ -259,6 +368,11 @@ export default function ProductsPage() {
     }
   ];
 
+  const handleOpenCategoryModal = () => {
+    fetchCategories();
+    setIsCategoryModalOpen(true);
+  };
+
   return (
     <div className="p-2 sm:p-4 space-y-6 max-w-7xl mx-auto">
       {/* Top Header & Actions */}
@@ -270,9 +384,14 @@ export default function ProductsPage() {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage products, visual barcodes, pricing, stock levels, and front website selection</p>
         </div>
 
-        <Button onClick={handleOpenAddModal} variant="primary" icon={Plus}>
-          Add New Product
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={handleOpenCategoryModal} variant="secondary" icon={Tag}>
+            Manage Categories
+          </Button>
+          <Button onClick={handleOpenAddModal} variant="primary" icon={Plus}>
+            Add New Product
+          </Button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -305,6 +424,91 @@ export default function ProductsPage() {
         isLoading={isLoading}
         emptyMessage="No products match your search criteria"
       />
+
+      {/* Manage Categories Modal */}
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        title="Manage Product Categories"
+        subtitle="Create new categories to organize products across store & website"
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-4">
+          <form onSubmit={handleAddCategorySubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Enter new category name (e.g. Pressure Cookers)..."
+              className="flex-1 p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
+              required
+            />
+            <Button type="submit" variant="primary" icon={Plus}>
+              Add
+            </Button>
+          </form>
+
+          <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Available Categories ({categories.length})</h4>
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {categories.map((cat, idx) => (
+                <div key={cat.id || idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  {editingCategoryId === cat.id ? (
+                    <div className="flex items-center gap-2 w-full">
+                      <input
+                        type="text"
+                        value={editingCategoryName}
+                        onChange={(e) => setEditingCategoryName(e.target.value)}
+                        className="flex-1 p-1.5 bg-white dark:bg-slate-800 border border-sky-500 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateCategorySubmit(cat.id)}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingCategoryId(null)}
+                        className="px-2.5 py-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg text-xs font-semibold hover:bg-slate-300 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Tag className="w-3.5 h-3.5 text-sky-500" />
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{cat.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditCategory(cat)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950 transition-colors cursor-pointer"
+                          title="Rename Category"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
+                          title="Delete Category"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {/* Barcode Viewer & Download Modal */}
       <Modal
@@ -380,19 +584,36 @@ export default function ProductsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">Category</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">Category *</label>
               <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                value={isCustomCategory ? 'CUSTOM' : formData.category}
+                onChange={(e) => {
+                  if (e.target.value === 'CUSTOM') {
+                    setIsCustomCategory(true);
+                  } else {
+                    setIsCustomCategory(false);
+                    setFormData({ ...formData, category: e.target.value });
+                  }
+                }}
                 className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
               >
-                <option value="Cookware">Cookware & Utensils</option>
-                <option value="Dinnerware">Dinner Thali Sets</option>
-                <option value="Appliances">Kitchen & Home Appliances</option>
-                <option value="Drinkware">Copper & Brassware</option>
-                <option value="Gift Sets">Gift & Marriage Sets</option>
-                <option value="General">General</option>
+                {categories.map((cat) => (
+                  <option key={cat.name} value={cat.name}>
+                    {cat.name}
+                  </option>
+                ))}
+                <option value="CUSTOM">+ Add Custom Category...</option>
               </select>
+              {isCustomCategory && (
+                <input
+                  type="text"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="Type custom category name..."
+                  className="mt-1.5 w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100"
+                  required
+                />
+              )}
             </div>
 
             <Input
@@ -469,9 +690,57 @@ export default function ProductsPage() {
               type="checkbox"
               checked={formData.show_on_website}
               onChange={(e) => setFormData({ ...formData, show_on_website: e.target.checked })}
-              className="w-4 h-4 text-sky-500 rounded border-slate-300 dark:border-slate-700 focus:ring-sky-500"
+              className="w-4 h-4 text-sky-500 rounded border-slate-300 dark:border-slate-700 focus:ring-sky-500 cursor-pointer"
             />
           </div>
+
+          {/* Image Upload Box - Appears ONLY when Show on Website is Enabled */}
+          {formData.show_on_website && (
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Upload className="w-4 h-4 text-sky-500" /> Landing Page Product Image *
+                </label>
+                <span className="text-[10px] text-slate-500">Displayed on Public Showcase Catalog</span>
+              </div>
+
+              {formData.image_url ? (
+                <div className="relative w-full h-36 rounded-xl border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-950 flex items-center justify-center group">
+                  <img src={formData.image_url} alt="Product Preview" className="w-full h-full object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, image_url: '' })}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all shadow-md cursor-pointer"
+                    title="Remove Image"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl cursor-pointer hover:border-sky-500 dark:hover:border-sky-500 bg-white dark:bg-slate-900 transition-colors">
+                    <div className="flex flex-col items-center justify-center py-2 text-center">
+                      <Upload className="w-6 h-6 text-slate-400 mb-1" />
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Click to upload product image file</p>
+                      <p className="text-[10px] text-slate-500">PNG, JPG, WebP up to 5MB</p>
+                    </div>
+                    <input type="file" accept="image/*" onChange={handleImageFileUpload} className="hidden" />
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Or Image Link:</span>
+                    <input
+                      type="url"
+                      value={formData.image_url || ''}
+                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                      placeholder="Paste image URL (https://...)"
+                      className="flex-1 p-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>

@@ -216,23 +216,23 @@ export default function InventoryPage() {
   ];
 
   return (
-    <div className="p-2 sm:p-4 space-y-6 max-w-7xl mx-auto">
+    <div className="p-2 sm:p-4 space-y-6 max-w-7xl mx-auto w-full overflow-x-hidden">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
             <Boxes className="w-5 h-5 text-[#C0392B] dark:text-[#E74C3C]" /> Inventory & Analytics Tracking
           </h2>
           <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">Real-time stock audit, purchase entries, and fast/slow-moving intelligence</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button onClick={() => window.print()} variant="secondary" icon={Printer}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full md:w-auto">
+          <Button onClick={() => window.print()} variant="secondary" icon={Printer} className="justify-center">
             Print Report
           </Button>
 
-          {/* Tab Buttons */}
-          <div className="flex items-center gap-1 bg-[#FAFAF8] dark:bg-[#121417] p-1 rounded-xl border border-slate-200 dark:border-[#2D3138] text-xs font-semibold">
+          {/* Scrollable Segmented Tab Control */}
+          <div className="flex items-center gap-1 bg-[#FAFAF8] dark:bg-[#121417] p-1 rounded-xl border border-slate-200 dark:border-[#2D3138] text-xs font-semibold overflow-x-auto max-w-full scrollbar-none">
             {[
               { id: 'stock', label: 'Stock Master', icon: Boxes },
               { id: 'fast', label: 'Fast Moving', icon: TrendingUp },
@@ -245,7 +245,7 @@ export default function InventoryPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap flex-shrink-0 ${
                     isSelected ? 'bg-[#C0392B] dark:bg-[#E74C3C] text-white shadow-xs font-bold' : 'text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-[#F1F1F1]'
                   }`}
                 >
@@ -258,6 +258,7 @@ export default function InventoryPage() {
         </div>
       </div>
 
+      {/* Stock Master View */}
       {activeTab === 'stock' && (
         <div className="space-y-4">
           <SearchBar
@@ -266,20 +267,193 @@ export default function InventoryPage() {
             onClear={() => setSearch('')}
             placeholder="Search stock by product name, barcode, SKU..."
           />
-          <DataTable columns={stockColumns} data={products} isLoading={isLoading} />
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <DataTable columns={stockColumns} data={products} isLoading={isLoading} />
+          </div>
+
+          {/* Mobile Cards View */}
+          <div className="block md:hidden space-y-3">
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-slate-500">Loading stock data...</div>
+            ) : products.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 glass-panel rounded-2xl">No products match search criteria</div>
+            ) : (
+              products.map((item) => (
+                <div key={item.id} className="p-4 rounded-2xl glass-panel border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-3 shadow-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.name}</h4>
+                      <p className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">Barcode: {item.barcode || 'N/A'} | SKU: {item.sku}</p>
+                      <p className="text-xs text-slate-600 dark:text-[#9CA3AF] mt-0.5">{item.category} / {item.brand}</p>
+                    </div>
+                    <TableActionsMenu
+                      actions={[
+                        {
+                          label: 'Adjust Stock Quantity',
+                          icon: RefreshCw,
+                          onClick: () => {
+                            setSelectedProduct(item);
+                            setQuantityChange('10');
+                            setAdjustmentNotes('');
+                            setIsModalOpen(true);
+                          }
+                        }
+                      ]}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138]">
+                      <span className="text-[10px] text-slate-500 block uppercase font-semibold">Current Stock</span>
+                      <span className="font-extrabold text-sm text-[#C0392B] dark:text-[#E74C3C]">{item.stock_quantity} units</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138]">
+                      <span className="text-[10px] text-slate-500 block uppercase font-semibold">Stock Status</span>
+                      <Badge variant={item.stock_quantity === 0 ? 'danger' : item.stock_quantity <= item.min_stock_level ? 'warning' : 'success'}>
+                        {item.stock_quantity === 0 ? 'Out of Stock' : item.stock_quantity <= item.min_stock_level ? 'Low Stock Alert' : 'Healthy Stock'}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between text-xs pt-1 border-t border-slate-100 dark:border-[#2D3138]/60">
+                    <span className="text-slate-500">Cost: <strong className="text-slate-900 dark:text-[#F1F1F1]">{formatCurrency(item.purchase_price * item.stock_quantity)}</strong></span>
+                    <span className="text-slate-500">Retail: <strong className="text-emerald-600 dark:text-emerald-400">{formatCurrency(item.selling_price * item.stock_quantity)}</strong></span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
+      {/* Fast Moving View */}
       {activeTab === 'fast' && (
-        <DataTable columns={fastColumns} data={fastMoving} isLoading={isLoading} emptyMessage="No fast moving product data available" />
+        <div>
+          <div className="hidden md:block">
+            <DataTable columns={fastColumns} data={fastMoving} isLoading={isLoading} emptyMessage="No fast moving product data available" />
+          </div>
+
+          <div className="block md:hidden space-y-3">
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-slate-500">Loading fast-moving analytics...</div>
+            ) : fastMoving.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 glass-panel rounded-2xl">No fast moving product data available</div>
+            ) : (
+              fastMoving.map((item, idx) => (
+                <div key={idx} className="p-4 rounded-2xl glass-panel border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-2 shadow-xs">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.name}</h4>
+                      <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">{item.category}</p>
+                    </div>
+                    <Badge variant="success">{item.total_units_sold} Sold</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100 dark:border-[#2D3138]">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">Total Revenue</span>
+                      <span className="font-bold text-slate-900 dark:text-[#F1F1F1]">{formatCurrency(item.total_revenue)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">Current Stock</span>
+                      <span className="font-semibold">{item.stock_quantity} in stock</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
+      {/* Slow Moving View */}
       {activeTab === 'slow' && (
-        <DataTable columns={slowColumns} data={slowMoving} isLoading={isLoading} emptyMessage="No slow moving product alerts" />
+        <div>
+          <div className="hidden md:block">
+            <DataTable columns={slowColumns} data={slowMoving} isLoading={isLoading} emptyMessage="No slow moving product alerts" />
+          </div>
+
+          <div className="block md:hidden space-y-3">
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-slate-500">Loading slow-moving analytics...</div>
+            ) : slowMoving.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 glass-panel rounded-2xl">No slow moving product alerts</div>
+            ) : (
+              slowMoving.map((item, idx) => (
+                <div key={idx} className="p-4 rounded-2xl glass-panel border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-2 shadow-xs">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.name}</h4>
+                      <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">{item.category}</p>
+                    </div>
+                    <Badge variant="warning">Slow Moving</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100 dark:border-[#2D3138]">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">Stock Sitting</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">{item.stock_quantity} units</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">Tied Capital</span>
+                      <span className="font-semibold text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(item.purchase_price * item.stock_quantity)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
+      {/* Audit Logs View */}
       {activeTab === 'logs' && (
-        <DataTable columns={logColumns} data={logs} isLoading={isLoading} emptyMessage="No inventory audit logs recorded" />
+        <div>
+          <div className="hidden md:block">
+            <DataTable columns={logColumns} data={logs} isLoading={isLoading} emptyMessage="No inventory audit logs recorded" />
+          </div>
+
+          <div className="block md:hidden space-y-3">
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-slate-500">Loading audit logs...</div>
+            ) : logs.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 glass-panel rounded-2xl">No inventory audit logs recorded</div>
+            ) : (
+              logs.map((item) => (
+                <div key={item.id} className="p-4 rounded-2xl glass-panel border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-2 shadow-xs">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.product_name}</h4>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">{new Date(item.created_at).toLocaleString('en-IN')}</p>
+                    </div>
+                    <Badge variant={item.quantity_change > 0 ? 'success' : 'danger'}>
+                      {item.change_type}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100 dark:border-[#2D3138]">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">Qty Change</span>
+                      <span className={`font-extrabold ${item.quantity_change > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">Balance Transition</span>
+                      <span className="font-semibold text-slate-800 dark:text-[#F1F1F1]">{item.previous_stock} → {item.new_stock}</span>
+                    </div>
+                  </div>
+
+                  {item.notes && (
+                    <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] bg-slate-50 dark:bg-[#121417] p-2 rounded-lg border border-slate-200 dark:border-[#2D3138]/60">
+                      Note: {item.notes}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
       {/* Adjust Stock Modal */}

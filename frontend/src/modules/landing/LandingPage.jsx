@@ -169,6 +169,15 @@ export default function LandingPage() {
   const [dbProducts, setDbProducts] = useState([]);
   const [useLiveDb, setUseLiveDb] = useState(false);
 
+  function getCategoryFallbackImage(category) {
+    const c = (category || '').toLowerCase();
+    if (c.includes('appl') || c.includes('kitchen')) return '/assets/cat_kitchen_appliances.png';
+    if (c.includes('home') || c.includes('fan') || c.includes('geyser')) return '/assets/cat_home_appliances.png';
+    if (c.includes('copper') || c.includes('brass') || c.includes('drink')) return '/assets/cat_copper_brass.png';
+    if (c.includes('gift') || c.includes('marriage')) return '/assets/cat_gift_sets.png';
+    return '/assets/cat_steel_utensils.png';
+  }
+
   // Fetch live products selected by Admin
   useEffect(() => {
     async function loadPublicCatalog() {
@@ -176,28 +185,8 @@ export default function LandingPage() {
         const res = await apiRequest('/products/public');
         if (res.success && res.products && res.products.length > 0) {
           const mapped = res.products.map((p) => {
-            let catKey = 'utensils';
-            let catName = 'Steel & Utensils';
-            let img = '/assets/cat_steel_utensils.png';
-
-            const c = (p.category || '').toLowerCase();
-            if (c.includes('appl') || c.includes('kitchen')) {
-              catKey = 'kitchen';
-              catName = 'Kitchen Appliances';
-              img = '/assets/cat_kitchen_appliances.png';
-            } else if (c.includes('home') || c.includes('fan') || c.includes('geyser')) {
-              catKey = 'home';
-              catName = 'Home Appliances';
-              img = '/assets/cat_home_appliances.png';
-            } else if (c.includes('copper') || c.includes('brass') || c.includes('drink')) {
-              catKey = 'copper';
-              catName = 'Copper & Brass';
-              img = '/assets/cat_copper_brass.png';
-            } else if (c.includes('gift') || c.includes('marriage')) {
-              catKey = 'gift';
-              catName = 'Gift Sets';
-              img = '/assets/cat_gift_sets.png';
-            }
+            const catName = p.category || 'General';
+            const catKey = catName.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
             return {
               id: p.id,
@@ -205,7 +194,7 @@ export default function LandingPage() {
               category: catKey,
               categoryName: catName,
               tag: p.brand || 'Featured',
-              image: p.image_url || img,
+              image: p.image_url || getCategoryFallbackImage(catName),
               desc: `${p.name} - Premium quality item available at Prabhuratna Metals.`,
               features: [`SKU: ${p.sku || 'N/A'}`, `GST: ${p.gst_percent || 18}%`, p.stock_quantity > 0 ? 'In Stock at Store' : 'Available on Order'],
               priceText: p.selling_price ? formatCurrency(p.selling_price) : 'Wholesale Rate',
@@ -223,6 +212,23 @@ export default function LandingPage() {
   }, []);
 
   const displayList = useLiveDb ? dbProducts : defaultCatalog;
+
+  // Dynamically extract categories that have at least 1 product (Hide empty categories!)
+  const availableCategoryTabs = React.useMemo(() => {
+    const tabs = [{ id: 'all', label: 'All Products' }];
+    const categoryMap = new Map();
+
+    displayList.forEach((p) => {
+      const catKey = (p.category || 'general').toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const catLabel = p.categoryName || p.category || 'General';
+      if (!categoryMap.has(catKey)) {
+        categoryMap.set(catKey, catLabel);
+        tabs.push({ id: catKey, label: catLabel });
+      }
+    });
+
+    return tabs;
+  }, [displayList]);
 
   // Filtered Products
   const filteredProducts = displayList.filter((p) => {
@@ -506,22 +512,15 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* Category Filter Tabs */}
+        {/* Category Filter Tabs (Hides empty categories automatically) */}
         <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-semibold">
-          {[
-            { id: 'all', label: 'All Products' },
-            { id: 'utensils', label: 'Steel & Utensils' },
-            { id: 'kitchen', label: 'Kitchen Appliances' },
-            { id: 'home', label: 'Home Appliances' },
-            { id: 'copper', label: 'Copper & Brass' },
-            { id: 'gift', label: 'Gift & Marriage Sets' }
-          ].map((tab) => (
+          {availableCategoryTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveCategory(tab.id)}
-              className={`px-4 py-2 rounded-xl transition-all ${
+              className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${
                 activeCategory === tab.id
-                  ? 'bg-[#C0392B] dark:bg-[#E74C3C] text-white shadow-sm'
+                  ? 'bg-[#C0392B] dark:bg-[#E74C3C] text-white shadow-sm font-bold'
                   : 'bg-[#FFFFFF] dark:bg-[#1E2126] text-[#4A5568] dark:text-[#94A3B8] border border-[#E5E7EB] dark:border-[#2D3138] hover:bg-[#FAFAF8] dark:hover:bg-[#121417]'
               }`}
             >
@@ -571,19 +570,15 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="p-5 border-t border-[#E5E7EB] dark:border-[#2D3138] flex items-center justify-between bg-[#FAFAF8] dark:bg-[#121417]">
-                <div>
-                  <span className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF] block">Pricing Info</span>
-                  <span className="text-sm font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{p.priceText}</span>
-                </div>
+              <div className="p-4 border-t border-[#E5E7EB] dark:border-[#2D3138] bg-[#FAFAF8] dark:bg-[#121417]">
                 <a
                   href={`https://wa.me/919824493420?text=${encodeURIComponent(`Hi Prabhuratna Metals, I want to inquire about: ${p.name}`)}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3.5 py-2 rounded-xl bg-[#C0392B] dark:bg-[#E74C3C] hover:bg-[#A93226] dark:hover:bg-[#EC7063] text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#C0392B] dark:bg-[#E74C3C] hover:bg-[#A93226] dark:hover:bg-[#EC7063] text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
                 >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span>Inquire Rate</span>
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Inquire Product / Best Rate</span>
                 </a>
               </div>
             </div>
