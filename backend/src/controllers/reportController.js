@@ -131,14 +131,32 @@ exports.getProfitReport = (req, res) => {
 
     const profitData = db.prepare(query).all(...params);
 
+    // Fetch total transport/freight expense for purchases in selected date range
+    let transportQuery = `SELECT SUM(COALESCE(transport_amount, 0)) as total_transport FROM purchases WHERE 1=1`;
+    const transportParams = [];
+
+    if (startDate) {
+      transportQuery += ` AND DATE(created_at) >= DATE(?)`;
+      transportParams.push(startDate);
+    }
+    if (endDate) {
+      transportQuery += ` AND DATE(created_at) <= DATE(?)`;
+      transportParams.push(endDate);
+    }
+
+    const transportResult = db.prepare(transportQuery).get(...transportParams);
+    const totalTransport = (transportResult && transportResult.total_transport) || 0;
+
     const summary = profitData.reduce((acc, curr) => {
       acc.totalRevenue += curr.total_revenue || 0;
       acc.totalCost += curr.total_cost || 0;
-      acc.totalProfit += curr.gross_profit || 0;
       acc.totalGrossProfit += curr.gross_profit || 0;
       return acc;
-    }, { totalRevenue: 0, totalCost: 0, totalProfit: 0, totalGrossProfit: 0 });
+    }, { totalRevenue: 0, totalCost: 0, totalGrossProfit: 0 });
 
+    summary.totalTransport = Math.round(totalTransport * 100) / 100;
+    summary.totalProfit = Math.round((summary.totalGrossProfit - totalTransport) * 100) / 100;
+    summary.netProfit = summary.totalProfit;
     summary.overallMargin = summary.totalRevenue > 0 ? ((summary.totalProfit / summary.totalRevenue) * 100).toFixed(2) : 0;
 
     return res.json({ success: true, summary, profitData });

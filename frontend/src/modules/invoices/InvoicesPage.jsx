@@ -325,6 +325,12 @@ export default function InvoicesPage() {
                     <span>-{formatCurrency(selectedInvoice.discount_amount)}</span>
                   </div>
                 )}
+                {parseFloat(selectedInvoice.scrap_value) > 0 && (
+                  <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                    <span>Less: Exchange/Scrap Value:</span>
+                    <span>-{formatCurrency(selectedInvoice.scrap_value)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm font-extrabold text-slate-900 dark:text-[#F1F1F1] pt-2 border-t border-slate-200 dark:border-[#2D3138]">
                   <span>Grand Total Paid:</span>
                   <span className="text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(selectedInvoice.grand_total)}</span>

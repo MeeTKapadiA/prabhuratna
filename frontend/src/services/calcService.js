@@ -3,15 +3,19 @@
  */
 
 export function calculateItemTotal(unitPrice = 0, quantity = 1, discountPercent = 0, gstPercent = 0) {
-  const price = parseFloat(unitPrice) || 0;
-  const qty = parseInt(quantity) || 1;
-  const disc = parseFloat(discountPercent) || 0;
-  const gst = parseFloat(gstPercent) || 0;
+  const price = parseFloat(unitPrice);
+  const validPrice = isNaN(price) ? 0 : price;
+  const qty = parseInt(quantity);
+  const validQty = isNaN(qty) ? 0 : qty;
+  const disc = parseFloat(discountPercent);
+  const validDisc = isNaN(disc) ? 0 : disc;
+  const gst = parseFloat(gstPercent);
+  const validGst = isNaN(gst) ? 0 : gst;
 
-  const basePrice = price * qty;
-  const discountAmount = basePrice * (disc / 100);
+  const basePrice = validPrice * validQty;
+  const discountAmount = basePrice * (validDisc / 100);
   const priceAfterDiscount = basePrice - discountAmount;
-  const gstAmount = priceAfterDiscount * (gst / 100);
+  const gstAmount = priceAfterDiscount * (validGst / 100);
   const total = priceAfterDiscount + gstAmount;
 
   return {
@@ -19,18 +23,19 @@ export function calculateItemTotal(unitPrice = 0, quantity = 1, discountPercent 
     discountAmount,
     priceAfterDiscount,
     gstAmount,
-    total: Math.round(total * 100) / 100
+    total: isNaN(total) ? 0 : Math.round(total * 100) / 100
   };
 }
 
-export function calculateCartTotals(items = [], overallDiscountPercent = 0) {
+export function calculateCartTotals(items = [], overallDiscountPercent = 0, scrapValue = 0) {
   let subtotal = 0;
   let itemDiscountsTotal = 0;
   let taxAmount = 0;
 
   items.forEach((item) => {
+    const rawPrice = item.unit_price !== undefined && item.unit_price !== null ? item.unit_price : item.selling_price;
     const calc = calculateItemTotal(
-      item.unit_price || item.selling_price,
+      rawPrice,
       item.quantity,
       item.discount_percent,
       item.gst_percent
@@ -43,7 +48,10 @@ export function calculateCartTotals(items = [], overallDiscountPercent = 0) {
   const overallDiscount = parseFloat(overallDiscountPercent) || 0;
   const billDiscountAmount = subtotal * (overallDiscount / 100);
   const finalSubtotal = subtotal - billDiscountAmount;
-  const grandTotal = Math.round((finalSubtotal + taxAmount) * 100) / 100;
+  const scrap = Math.max(0, parseFloat(scrapValue) || 0);
+
+  const rawGrandTotal = finalSubtotal + taxAmount - scrap;
+  const grandTotal = Math.max(0, Math.round(rawGrandTotal * 100) / 100);
 
   return {
     subtotal: Math.round(subtotal * 100) / 100,
@@ -51,7 +59,8 @@ export function calculateCartTotals(items = [], overallDiscountPercent = 0) {
     billDiscountAmount: Math.round(billDiscountAmount * 100) / 100,
     totalDiscount: Math.round((itemDiscountsTotal + billDiscountAmount) * 100) / 100,
     taxAmount: Math.round(taxAmount * 100) / 100,
-    grandTotal
+    scrapValue: Math.round(scrap * 100) / 100,
+    grandTotal: isNaN(grandTotal) ? 0 : grandTotal
   };
 }
 

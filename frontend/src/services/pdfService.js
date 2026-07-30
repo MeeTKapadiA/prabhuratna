@@ -140,29 +140,38 @@ export function generateInvoicePDF(invoice, options = {}) {
   });
 
   // 5. Totals Breakdown
-  const finalY = doc.lastAutoTable.finalY + 8;
+  let currentY = doc.lastAutoTable.finalY + 8;
   const rightX = 196;
   const labelX = 135;
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('Subtotal:', labelX, finalY);
-  doc.text(formatCurrencyPDF(invoice.subtotal), rightX, finalY, { align: 'right' });
+  doc.text('Subtotal:', labelX, currentY);
+  doc.text(formatCurrencyPDF(invoice.subtotal), rightX, currentY, { align: 'right' });
+  currentY += 5;
 
-  doc.text('Tax (GST Total):', labelX, finalY + 5);
-  doc.text(formatCurrencyPDF(invoice.tax_amount), rightX, finalY + 5, { align: 'right' });
+  doc.text('Tax (GST Total):', labelX, currentY);
+  doc.text(formatCurrencyPDF(invoice.tax_amount), rightX, currentY, { align: 'right' });
+  currentY += 5;
 
   if (parseFloat(invoice.discount_amount) > 0) {
-    doc.text('Overall Bill Discount:', labelX, finalY + 10);
-    doc.text(`- ${formatCurrencyPDF(invoice.discount_amount)}`, rightX, finalY + 10, { align: 'right' });
+    doc.text('Overall Bill Discount:', labelX, currentY);
+    doc.text(`- ${formatCurrencyPDF(invoice.discount_amount)}`, rightX, currentY, { align: 'right' });
+    currentY += 5;
   }
 
-  const lineY = parseFloat(invoice.discount_amount) > 0 ? finalY + 14 : finalY + 9;
+  const scrapVal = parseFloat(invoice.scrap_value) || 0;
+  if (scrapVal > 0) {
+    doc.text('Less: Exchange/Scrap Value:', labelX, currentY);
+    doc.text(`- ${formatCurrencyPDF(scrapVal)}`, rightX, currentY, { align: 'right' });
+    currentY += 5;
+  }
+
   doc.setLineWidth(0.4);
   doc.setDrawColor(203, 213, 225);
-  doc.line(labelX, lineY, rightX, lineY);
+  doc.line(labelX, currentY - 1, rightX, currentY - 1);
 
-  const grandTotalY = lineY + 6;
+  const grandTotalY = currentY + 4;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.text('Grand Total:', labelX, grandTotalY);
@@ -210,6 +219,7 @@ export function generateQuotationPDF(quotation, options = {}) {
   const settings = options.settings || quotation.settings || {};
   const shopName = settings.shop_name || 'Prabhuratna Metals Pvt. Ltd.';
   const shopAddress = settings.shop_address || 'Main Market Road, Commercial Complex, Ahmedabad, GJ';
+  const shopGstin = settings.shop_gstin || '24ABCDE1234F1Z5';
   const shopPhone = settings.shop_phone || '+91 98765 43210';
   const shopEmail = settings.shop_email || 'info@prabhuratna.com';
   const footerNote = settings.invoice_footer_note || 'Thank you for shopping with us! Visit again.';
@@ -251,7 +261,8 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text(shopName, 14, 36);
   doc.setFont('helvetica', 'normal');
   doc.text(shopAddress, 14, 41);
-  doc.text(`Ph: ${shopPhone} | Email: ${shopEmail}`, 14, 46);
+  doc.text(`GSTIN: ${shopGstin} | Ph: ${shopPhone}`, 14, 46);
+  doc.text(`Email: ${shopEmail}`, 14, 51);
 
   // Right: Quotation Metadata (Two-Column Alignment)
   const metaLabelX = 150;

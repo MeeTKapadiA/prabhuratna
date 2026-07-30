@@ -30,6 +30,7 @@ export default function PurchasesPage() {
   const [formNotes, setFormNotes] = useState('');
   const [formPaymentStatus, setFormPaymentStatus] = useState('unpaid');
   const [formAmountPaid, setFormAmountPaid] = useState('0');
+  const [formTransportAmount, setFormTransportAmount] = useState('0');
   const [formItems, setFormItems] = useState([
     { product_id: '', product_name: '', quantity: '1', purchase_price: '0', total_price: '0' }
   ]);
@@ -113,7 +114,8 @@ export default function PurchasesPage() {
   // Totals Calculation
   const subtotal = formItems.reduce((sum, item) => sum + (parseFloat(item.total_price) || 0), 0);
   const taxAmount = subtotal * 0.18; // 18% GST default
-  const grandTotal = subtotal + taxAmount;
+  const transportAmount = Math.max(0, parseFloat(formTransportAmount) || 0);
+  const grandTotal = subtotal + taxAmount + transportAmount;
 
   const handleSubmitPurchase = async (e) => {
     e.preventDefault();
@@ -133,6 +135,7 @@ export default function PurchasesPage() {
         supplier_id: parseInt(formSupplierId),
         subtotal,
         tax_amount: taxAmount,
+        transport_amount: transportAmount,
         grand_total: grandTotal,
         payment_status: formPaymentStatus,
         amount_paid: parseFloat(formAmountPaid) || 0,
@@ -155,6 +158,7 @@ export default function PurchasesPage() {
         setFormNotes('');
         setFormPaymentStatus('unpaid');
         setFormAmountPaid('0');
+        setFormTransportAmount('0');
         setFormItems([{ product_id: '', product_name: '', quantity: '1', purchase_price: '0', total_price: '0' }]);
         fetchData();
       }
@@ -494,12 +498,21 @@ export default function PurchasesPage() {
 
           {/* Notes & Summary Breakdown */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-slate-200 dark:border-[#2D3138]">
-            <Input
-              label="Purchase Order Notes / Remarks"
-              value={formNotes}
-              onChange={(e) => setFormNotes(e.target.value)}
-              placeholder="e.g. Invoice #1092 from vendor. Stock delivered to shop."
-            />
+            <div className="space-y-3">
+              <Input
+                label="Transport / Freight Charges (₹)"
+                type="number"
+                value={formTransportAmount}
+                onChange={(e) => setFormTransportAmount(e.target.value)}
+                placeholder="0.00 (Freight/Shipping expense)"
+              />
+              <Input
+                label="Purchase Order Notes / Remarks"
+                value={formNotes}
+                onChange={(e) => setFormNotes(e.target.value)}
+                placeholder="e.g. Invoice #1092 from vendor. Stock delivered to shop."
+              />
+            </div>
 
             <div className="p-4 bg-slate-50 dark:bg-[#121417] rounded-xl border border-slate-200 dark:border-[#2D3138] space-y-2 text-sm">
               <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
@@ -510,6 +523,12 @@ export default function PurchasesPage() {
                 <span>Estimated GST Tax (18%):</span>
                 <span className="font-semibold">{formatCurrency(taxAmount)}</span>
               </div>
+              {transportAmount > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                  <span>Transport / Freight Charges:</span>
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">+{formatCurrency(transportAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-extrabold text-slate-900 dark:text-[#F1F1F1] pt-2 border-t border-slate-200 dark:border-[#2D3138]">
                 <span>Grand Total Payable:</span>
                 <span className="text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(grandTotal)}</span>
@@ -568,6 +587,12 @@ export default function PurchasesPage() {
             <div className="p-3 bg-slate-50 dark:bg-[#121417] rounded-xl border border-slate-200 dark:border-[#2D3138] space-y-1 text-xs">
               <div className="flex justify-between"><span>Subtotal:</span><span>{formatCurrency(selectedPurchase.subtotal)}</span></div>
               <div className="flex justify-between"><span>Tax Amount:</span><span>{formatCurrency(selectedPurchase.tax_amount)}</span></div>
+              {parseFloat(selectedPurchase.transport_amount) > 0 && (
+                <div className="flex justify-between text-amber-600 dark:text-amber-400 font-semibold">
+                  <span>Transport / Freight Charges:</span>
+                  <span>+{formatCurrency(selectedPurchase.transport_amount)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-sm text-[#C0392B] dark:text-[#E74C3C]"><span>Grand Total:</span><span>{formatCurrency(selectedPurchase.grand_total)}</span></div>
               <div className="flex justify-between text-emerald-600 font-semibold"><span>Amount Paid:</span><span>{formatCurrency(selectedPurchase.amount_paid)}</span></div>
             </div>

@@ -39,6 +39,7 @@ export default function BillingPage() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [paymentMode, setPaymentMode] = useState('CASH'); // CASH, UPI, CARD, MIXED
   const [overallDiscount, setOverallDiscount] = useState(0);
+  const [scrapValue, setScrapValue] = useState(0);
   const [notes, setNotes] = useState('');
 
   // Post Checkout Invoice Modal
@@ -208,11 +209,16 @@ export default function BillingPage() {
     setCartItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const cartTotals = calculateCartTotals(cartItems, overallDiscount);
+  const cartTotals = calculateCartTotals(cartItems, overallDiscount, scrapValue);
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
       showToast('Cart is empty. Scan items or search to add.', 'error');
+      return;
+    }
+
+    if (isNaN(cartTotals.grandTotal) || cartTotals.grandTotal <= 0) {
+      showToast('Checkout blocked: Invoice Grand Total is ₹0 or invalid. Please check cart items and pricing.', 'error');
       return;
     }
 
@@ -226,6 +232,7 @@ export default function BillingPage() {
         subtotal: cartTotals.subtotal,
         tax_amount: cartTotals.taxAmount,
         discount_amount: cartTotals.totalDiscount,
+        scrap_value: cartTotals.scrapValue,
         grand_total: cartTotals.grandTotal,
         notes,
         items: cartItems.map((item) => {
@@ -261,6 +268,7 @@ export default function BillingPage() {
         setCustomerPhone('');
         setCustomerEmail('');
         setOverallDiscount(0);
+        setScrapValue(0);
         setNotes('');
         showToast('Invoice generated successfully!', 'success');
       }
@@ -301,8 +309,9 @@ export default function BillingPage() {
         </div>
       </div>
 
+      {/* Main Billing Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Cart Table & Barcode Input */}
+        {/* Left Col: Cart Table & Barcode Input */}
         <div className="lg:col-span-2 space-y-4">
           {/* Barcode Gun Input Field */}
           <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
@@ -332,8 +341,9 @@ export default function BillingPage() {
               </span>
               {cartItems.length > 0 && (
                 <button
+                  type="button"
                   onClick={() => setCartItems([])}
-                  className="text-xs text-rose-500 hover:underline font-semibold"
+                  className="text-xs text-rose-500 hover:underline font-semibold cursor-pointer"
                 >
                   Clear Cart
                 </button>
@@ -351,7 +361,7 @@ export default function BillingPage() {
                     <th className="px-3 py-3 text-center">Disc %</th>
                     <th className="px-3 py-3 text-center">GST %</th>
                     <th className="px-4 py-3 text-right">Subtotal</th>
-                    <th className="px-3 py-3 text-center">Remove</th>
+                    <th className="px-3 py-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-[#2D3138]">
@@ -378,6 +388,7 @@ export default function BillingPage() {
                           <td className="px-3 py-3 text-center">
                             <div className="inline-flex items-center gap-1.5 border border-slate-300 dark:border-[#2D3138] rounded-xl p-1 bg-white dark:bg-[#121417]">
                               <button
+                                type="button"
                                 onClick={() => updateQuantity(idx, item.quantity - 1)}
                                 className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF] cursor-pointer"
                               >
@@ -385,6 +396,7 @@ export default function BillingPage() {
                               </button>
                               <span className="w-6 font-bold text-center text-slate-900 dark:text-[#F1F1F1]">{item.quantity}</span>
                               <button
+                                type="button"
                                 onClick={() => updateQuantity(idx, item.quantity + 1)}
                                 className="p-1 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-600 dark:text-[#9CA3AF] cursor-pointer"
                               >
@@ -413,6 +425,7 @@ export default function BillingPage() {
                           </td>
                           <td className="px-3 py-3 text-center">
                             <button
+                              type="button"
                               onClick={() => removeFromCart(idx)}
                               className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
                             >
@@ -443,6 +456,7 @@ export default function BillingPage() {
                           <p className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">SKU: {item.sku}</p>
                         </div>
                         <button
+                          type="button"
                           onClick={() => removeFromCart(idx)}
                           className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
                         >
@@ -461,12 +475,12 @@ export default function BillingPage() {
                         </div>
                       </div>
 
-                      {/* Mobile Touch Controls Row */}
                       <div className="flex items-center justify-between gap-2 pt-1">
                         <div className="flex items-center gap-1">
                           <span className="text-[10px] text-slate-500 font-bold uppercase mr-1">Qty:</span>
                           <div className="inline-flex items-center border border-slate-300 dark:border-[#2D3138] rounded-xl p-1 bg-white dark:bg-[#121417]">
                             <button
+                              type="button"
                               onClick={() => updateQuantity(idx, item.quantity - 1)}
                               className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-700 dark:text-[#F1F1F1]"
                             >
@@ -474,6 +488,7 @@ export default function BillingPage() {
                             </button>
                             <span className="w-7 font-bold text-center text-sm text-slate-900 dark:text-[#F1F1F1]">{item.quantity}</span>
                             <button
+                              type="button"
                               onClick={() => updateQuantity(idx, item.quantity + 1)}
                               className="p-1.5 hover:bg-slate-100 dark:hover:bg-[#1E2126] rounded text-slate-700 dark:text-[#F1F1F1]"
                             >
@@ -483,24 +498,20 @@ export default function BillingPage() {
                         </div>
 
                         <div className="flex items-center gap-2 text-xs">
-                          <div>
-                            <span className="text-[10px] text-slate-500 block">Disc %</span>
-                            <input
-                              type="number"
-                              value={item.discount_percent}
-                              onChange={(e) => updateDiscount(idx, e.target.value)}
-                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
-                            />
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-500 block">GST %</span>
-                            <input
-                              type="number"
-                              value={item.gst_percent}
-                              onChange={(e) => updateGst(idx, e.target.value)}
-                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
-                            />
-                          </div>
+                          <input
+                            type="number"
+                            value={item.discount_percent}
+                            onChange={(e) => updateDiscount(idx, e.target.value)}
+                            className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
+                            placeholder="Disc %"
+                          />
+                          <input
+                            type="number"
+                            value={item.gst_percent}
+                            onChange={(e) => updateGst(idx, e.target.value)}
+                            className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
+                            placeholder="GST %"
+                          />
                         </div>
                       </div>
                     </div>
@@ -518,27 +529,37 @@ export default function BillingPage() {
               <CreditCard className="w-4 h-4 text-[#C0392B] dark:text-[#E74C3C]" /> Checkout Summary
             </h3>
 
-            {/* Customer Details */}
+            {/* Customer & Billing Inputs */}
             <div className="space-y-3">
-              <Input
-                label="Customer Name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Walk-in Customer"
-              />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Input
+                  label="Customer Name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Walk-in Customer"
+                />
                 <Input
                   label="Phone Number"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   placeholder="10-digit Mobile"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <Input
-                  label="Overall Disc (₹)"
+                  label="Overall Disc (%)"
                   type="number"
                   value={overallDiscount}
                   onChange={(e) => setOverallDiscount(e.target.value)}
                   placeholder="0"
+                />
+                <Input
+                  label="Exchange / Scrap (₹)"
+                  type="number"
+                  value={scrapValue}
+                  onChange={(e) => setScrapValue(e.target.value)}
+                  placeholder="0 (Old item exchange)"
                 />
               </div>
             </div>
@@ -584,16 +605,22 @@ export default function BillingPage() {
               </div>
               <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
                 <span>Item Level Discounts:</span>
-                <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.totalItemDiscount)}</span>
+                <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.itemDiscountsTotal)}</span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
                 <span>Estimated Tax (GST):</span>
-                <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(cartTotals.totalGst)}</span>
+                <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(cartTotals.taxAmount)}</span>
               </div>
-              {cartTotals.overallDiscount > 0 && (
+              {cartTotals.billDiscountAmount > 0 && (
                 <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
                   <span>Flat Cash Discount:</span>
-                  <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.overallDiscount)}</span>
+                  <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.billDiscountAmount)}</span>
+                </div>
+              )}
+              {cartTotals.scrapValue > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                  <span>Less: Exchange/Scrap Value:</span>
+                  <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.scrapValue)}</span>
                 </div>
               )}
               <div className="pt-2 border-t border-slate-200 dark:border-[#2D3138] flex justify-between items-center text-sm">
@@ -727,6 +754,12 @@ export default function BillingPage() {
                 <span className="text-slate-500 dark:text-[#9CA3AF]">Date & Time:</span>
                 <span>{new Date(completedInvoice.created_at).toLocaleString('en-IN')}</span>
               </div>
+              {parseFloat(completedInvoice.scrap_value) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-[#9CA3AF]">Less: Exchange/Scrap Value:</span>
+                  <span className="font-bold text-rose-500">-{formatCurrency(completedInvoice.scrap_value)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm font-extrabold pt-2 border-t border-slate-200 dark:border-[#2D3138]">
                 <span>Total Paid Amount:</span>
                 <span className="text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(completedInvoice.grand_total)}</span>

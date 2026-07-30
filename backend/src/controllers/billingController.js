@@ -10,6 +10,7 @@ exports.createInvoice = (req, res) => {
       subtotal: rawSubtotal,
       tax_amount: rawTaxAmount,
       discount_amount: rawDiscountAmount,
+      scrap_value: rawScrapValue,
       grand_total: rawGrandTotal,
       payment_mode,
       notes,
@@ -27,19 +28,20 @@ exports.createInvoice = (req, res) => {
     // Auto-calculate totals if not passed or zero
     let calcSubtotal = 0;
     let calcTax = 0;
-    let calcDiscount = parseFloat(rawDiscountAmount) || 0;
+    let calcDiscount = !isNaN(parseFloat(rawDiscountAmount)) ? parseFloat(rawDiscountAmount) : 0;
+    const rawScrap = !isNaN(parseFloat(rawScrapValue)) ? Math.max(0, parseFloat(rawScrapValue)) : 0;
 
     const processedItems = items.map((item) => {
-      const uPrice = parseFloat(item.unit_price) || 0;
-      const qty = parseInt(item.quantity) || 1;
-      const disc = parseFloat(item.discount_percent) || 0;
-      const gst = parseFloat(item.gst_percent) || 0;
+      const uPrice = !isNaN(parseFloat(item.unit_price)) ? parseFloat(item.unit_price) : (!isNaN(parseFloat(item.selling_price)) ? parseFloat(item.selling_price) : 0);
+      const qty = !isNaN(parseInt(item.quantity)) ? parseInt(item.quantity) : 1;
+      const disc = !isNaN(parseFloat(item.discount_percent)) ? parseFloat(item.discount_percent) : 0;
+      const gst = !isNaN(parseFloat(item.gst_percent)) ? parseFloat(item.gst_percent) : 0;
 
       const base = uPrice * qty;
       const itemDisc = base * (disc / 100);
       const afterDisc = base - itemDisc;
       const itemGst = afterDisc * (gst / 100);
-      const itemTotal = parseFloat(item.total_price) || Math.round((afterDisc + itemGst) * 100) / 100;
+      const itemTotal = !isNaN(parseFloat(item.total_price)) ? parseFloat(item.total_price) : Math.round((afterDisc + itemGst) * 100) / 100;
 
       calcSubtotal += afterDisc;
       calcTax += itemGst;
@@ -54,9 +56,28 @@ exports.createInvoice = (req, res) => {
       };
     });
 
-    const finalSubtotal = parseFloat(rawSubtotal) > 0 ? parseFloat(rawSubtotal) : Math.round(calcSubtotal * 100) / 100;
-    const finalTax = parseFloat(rawTaxAmount) > 0 ? parseFloat(rawTaxAmount) : Math.round(calcTax * 100) / 100;
-    const finalGrandTotal = parseFloat(rawGrandTotal) > 0 ? parseFloat(rawGrandTotal) : Math.round((finalSubtotal + finalTax - calcDiscount) * 100) / 100;
+    const parsedSubtotal = parseFloat(rawSubtotal);
+    const finalSubtotal = !isNaN(parsedSubtotal) && parsedSubtotal >= 0 ? Math.round(parsedSubtotal * 100) / 100 : Math.round(calcSubtotal * 100) / 100;
+
+    const parsedTax = parseFloat(rawTaxAmount);
+    const finalTax = !isNaN(parsedTax) && parsedTax >= 0 ? Math.round(parsedTax * 100) / 100 : Math.round(calcTax * 100) / 100;
+
+    const parsedDiscount = parseFloat(rawDiscountAmount);
+    const finalDiscount = !isNaN(parsedDiscount) && parsedDiscount >= 0 ? Math.round(parsedDiscount * 100) / 100 : Math.round(calcDiscount * 100) / 100;
+
+    const finalScrap = rawScrap;
+
+    const calculatedGrand = Math.max(0, Math.round((finalSubtotal + finalTax - finalDiscount - finalScrap) * 100) / 100);
+    const parsedGrandTotal = parseFloat(rawGrandTotal);
+    const finalGrandTotal = !isNaN(parsedGrandTotal) && parsedGrandTotal > 0 ? Math.round(parsedGrandTotal * 100) / 100 : calculatedGrand;
+
+    // Safeguard: Block checkout if grand_total is NaN or <= 0
+    if (isNaN(finalGrandTotal) || finalGrandTotal <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invoice grand total is invalid or ₹0. Please check items and pricing before proceeding.'
+      });
+    }
 
     // Execute in transaction (atomic & thread-safe)
     const transaction = db.transaction(() => {
@@ -82,8 +103,8 @@ exports.createInvoice = (req, res) => {
       const invoiceStmt = db.prepare(`
         INSERT INTO invoices (
           invoice_number, customer_name, customer_phone, customer_email,
-          subtotal, tax_amount, discount_amount, grand_total, payment_mode, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          subtotal, tax_amount, discount_amount, scrap_value, grand_total, payment_mode, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const result = invoiceStmt.run(
@@ -93,7 +114,8 @@ exports.createInvoice = (req, res) => {
         customer_email || '',
         finalSubtotal,
         finalTax,
-        calcDiscount,
+        finalDiscount,
+        finalScrap,
         finalGrandTotal,
         payment_mode,
         notes || ''

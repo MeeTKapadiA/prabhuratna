@@ -7,6 +7,7 @@ exports.createPurchase = (req, res) => {
       supplier_id,
       subtotal,
       tax_amount,
+      transport_amount,
       grand_total,
       payment_status,
       amount_paid,
@@ -32,26 +33,33 @@ exports.createPurchase = (req, res) => {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const purchaseNumber = `PUR-${dateStr}-${randomNum}`;
 
+    const subTotalVal = parseFloat(subtotal) || 0;
+    const taxVal = parseFloat(tax_amount) || 0;
+    const transportVal = Math.max(0, parseFloat(transport_amount) || 0);
+
+    const calculatedGrand = subTotalVal + taxVal + transportVal;
+    const gTotal = parseFloat(grand_total) > 0 ? parseFloat(grand_total) : calculatedGrand;
     const paidAmt = parseFloat(amount_paid) || 0;
-    const gTotal = parseFloat(grand_total) || 0;
     const pStatus = payment_status || (paidAmt >= gTotal ? 'paid' : paidAmt > 0 ? 'partial' : 'unpaid');
-    const remainingBalance = gTotal - paidAmt;
+
+    const itemsSubtotal = subTotalVal > 0 ? subTotalVal : items.reduce((acc, it) => acc + ((parseInt(it.quantity) || 1) * (parseFloat(it.purchase_price) || 0)), 0);
 
     // Execute in transaction
     const transaction = db.transaction(() => {
       // 1. Insert Purchase
       const purchaseStmt = db.prepare(`
         INSERT INTO purchases (
-          purchase_number, supplier_id, subtotal, tax_amount, grand_total,
+          purchase_number, supplier_id, subtotal, tax_amount, transport_amount, grand_total,
           payment_status, amount_paid, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const result = purchaseStmt.run(
         purchaseNumber,
         supplier_id,
-        parseFloat(subtotal) || 0,
-        parseFloat(tax_amount) || 0,
+        subTotalVal,
+        taxVal,
+        transportVal,
         gTotal,
         pStatus,
         paidAmt,
@@ -83,6 +91,11 @@ exports.createPurchase = (req, res) => {
         const pPrice = parseFloat(item.purchase_price) || 0;
         const tPrice = parseFloat(item.total_price) || (qty * pPrice);
 
+        // Landed Cost Calculation: Proportional transport added per unit
+        const proportionalTransport = itemsSubtotal > 0 ? (tPrice / itemsSubtotal) * transportVal : (items.length > 0 ? transportVal / items.length : 0);
+        const transportPerUnit = qty > 0 ? proportionalTransport / qty : 0;
+        const landedCostPerUnit = Math.round((pPrice + transportPerUnit) * 100) / 100;
+
         itemStmt.run(
           purchaseId,
           item.product_id || null,
@@ -98,7 +111,7 @@ exports.createPurchase = (req, res) => {
             const prevStock = prod.stock_quantity;
             const newStock = prevStock + qty;
 
-            updateProdStmt.run(qty, pPrice, item.product_id);
+            updateProdStmt.run(qty, landedCostPerUnit, item.product_id);
             logStmt.run(
               item.product_id,
               qty,

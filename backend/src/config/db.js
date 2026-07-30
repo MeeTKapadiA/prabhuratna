@@ -91,6 +91,7 @@ function initDb() {
       subtotal REAL NOT NULL,
       tax_amount REAL NOT NULL,
       discount_amount REAL DEFAULT 0,
+      scrap_value REAL DEFAULT 0.0,
       grand_total REAL NOT NULL,
       payment_mode TEXT NOT NULL,
       notes TEXT,
@@ -190,6 +191,7 @@ function initDb() {
       supplier_id INTEGER NOT NULL,
       subtotal REAL NOT NULL,
       tax_amount REAL DEFAULT 0.0,
+      transport_amount REAL DEFAULT 0.0,
       grand_total REAL NOT NULL,
       payment_status TEXT DEFAULT 'unpaid',
       amount_paid REAL DEFAULT 0.0,
@@ -307,6 +309,12 @@ function initDb() {
   } catch (e) {}
   try {
     db.exec(`ALTER TABLE suppliers ADD COLUMN current_balance REAL DEFAULT 0.0`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE invoices ADD COLUMN scrap_value REAL DEFAULT 0.0`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE purchases ADD COLUMN transport_amount REAL DEFAULT 0.0`);
   } catch (e) {}
 
   // Seed default business settings if empty
