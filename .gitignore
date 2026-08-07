@@ -19,6 +19,16 @@ build/
 .env.test.local
 .env.production.local
 
+# Local databases
+*.sqlite
+*.sqlite-journal
+backend/database.sqlite
+
+# SonarQube / coverage
+.scannerwork/
+.sonar/
+coverage/
+
 # OS generated files
 .DS_Store
 Thumbs.db

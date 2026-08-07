@@ -196,7 +196,7 @@ export default function LandingPage() {
               tag: p.brand || 'Featured',
               image: p.image_url || getCategoryFallbackImage(catName),
               desc: `${p.name} - Premium quality item available at Prabhuratna Metals.`,
-              features: [`SKU: ${p.sku || 'N/A'}`, `GST: ${p.gst_percent || 18}%`, p.stock_quantity > 0 ? 'In Stock at Store' : 'Available on Order'],
+              features: [`SKU: ${p.sku || 'N/A'}`, `GST: ${p.gst_percent || 18}%`, p.in_stock ? 'In Stock at Store' : 'Available on Order'],
               priceText: p.selling_price ? formatCurrency(p.selling_price) : 'Wholesale Rate',
               brands: p.brand || 'Prabhuratna'
             };
@@ -924,7 +924,6 @@ export default function LandingPage() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        initialMode="login"
         onSuccess={(user) => navigate(getDefaultRouteForUser(user))}
       />
     </div>

@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { getFinancialYear } = require('../utils/fyHelper');
+const { roundMoney, processSaleItems } = require('../utils/saleItems');
 
 exports.createQuotation = (req, res) => {
   try {
@@ -8,10 +9,7 @@ exports.createQuotation = (req, res) => {
       customer_phone,
       customer_email,
       customer_address,
-      subtotal,
-      tax_amount,
       discount_amount,
-      grand_total,
       notes,
       valid_until,
       items
@@ -24,6 +22,11 @@ exports.createQuotation = (req, res) => {
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Quotation items are required' });
     }
+
+    const { processedItems, finalSubtotal, finalTax } = processSaleItems(items);
+    const requestedDiscount = Math.max(0, parseFloat(discount_amount) || 0);
+    const finalDiscount = roundMoney(Math.min(requestedDiscount, finalSubtotal + finalTax));
+    const finalGrandTotal = Math.max(0, roundMoney(finalSubtotal + finalTax - finalDiscount));
 
     const transaction = db.transaction(() => {
       // Atomic sequential quotation number generation
@@ -57,10 +60,10 @@ exports.createQuotation = (req, res) => {
         customer_phone || '',
         customer_email || '',
         customer_address || '',
-        parseFloat(subtotal) || 0,
-        parseFloat(tax_amount) || 0,
-        parseFloat(discount_amount) || 0,
-        parseFloat(grand_total) || 0,
+        finalSubtotal,
+        finalTax,
+        finalDiscount,
+        finalGrandTotal,
         notes || '',
         valid_until || null
       );
@@ -74,17 +77,17 @@ exports.createQuotation = (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      for (const item of items) {
+      for (const item of processedItems) {
         itemStmt.run(
           quotationId,
           item.product_id || null,
           item.product_name,
           item.barcode || '',
-          parseFloat(item.unit_price) || 0,
-          parseInt(item.quantity) || 1,
-          parseFloat(item.discount_percent) || 0,
-          parseFloat(item.gst_percent) || 0,
-          parseFloat(item.total_price) || 0
+          item.unit_price,
+          item.quantity,
+          item.discount_percent,
+          item.gst_percent,
+          item.total_price
         );
       }
 
@@ -105,7 +108,10 @@ exports.createQuotation = (req, res) => {
     });
   } catch (error) {
     console.error('Error creating quotation:', error);
-    return res.status(500).json({ success: false, message: 'Failed to create quotation' });
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode === 400 ? error.message : 'Failed to create quotation'
+    });
   }
 };
 

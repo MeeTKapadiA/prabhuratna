@@ -23,6 +23,17 @@ const db = new Database(dbPath);
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
+function runMigration(sql) {
+  try {
+    db.exec(sql);
+  } catch (error) {
+    const message = String(error.message || '');
+    if (!message.includes('duplicate column name') && !message.includes('already exists')) {
+      console.warn('SQLite migration skipped:', message);
+    }
+  }
+}
+
 function initDb() {
   // Users Table
   db.exec(`
@@ -39,19 +50,10 @@ function initDb() {
     );
   `);
 
-  // Migrations for Users Table in SQLite
-  try {
-    db.exec(`ALTER TABLE users ADD COLUMN username TEXT`);
-  } catch (e) {}
-  try {
-    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
-  } catch (e) {}
-  try {
-    db.exec(`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'`);
-  } catch (e) {}
-  try {
-    db.exec(`ALTER TABLE users ADD COLUMN last_login DATETIME`);
-  } catch (e) {}
+  runMigration(`ALTER TABLE users ADD COLUMN username TEXT`);
+  runMigration(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
+  runMigration(`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'`);
+  runMigration(`ALTER TABLE users ADD COLUMN last_login DATETIME`);
 
   // Products Table
   db.exec(`
@@ -76,9 +78,7 @@ function initDb() {
     );
   `);
 
-  try {
-    db.exec(`ALTER TABLE products ADD COLUMN show_on_website INTEGER DEFAULT 1`);
-  } catch (e) {}
+  runMigration(`ALTER TABLE products ADD COLUMN show_on_website INTEGER DEFAULT 1`);
 
   // Invoices Table
   db.exec(`
@@ -303,19 +303,10 @@ function initDb() {
   `);
   defaultCategories.forEach(cat => insertCategory.run(cat));
 
-  // Migrations wrapped in try/catch
-  try {
-    db.exec(`ALTER TABLE return_items ADD COLUMN is_damaged INTEGER DEFAULT 0`);
-  } catch (e) {}
-  try {
-    db.exec(`ALTER TABLE suppliers ADD COLUMN current_balance REAL DEFAULT 0.0`);
-  } catch (e) {}
-  try {
-    db.exec(`ALTER TABLE invoices ADD COLUMN scrap_value REAL DEFAULT 0.0`);
-  } catch (e) {}
-  try {
-    db.exec(`ALTER TABLE purchases ADD COLUMN transport_amount REAL DEFAULT 0.0`);
-  } catch (e) {}
+  runMigration(`ALTER TABLE return_items ADD COLUMN is_damaged INTEGER DEFAULT 0`);
+  runMigration(`ALTER TABLE suppliers ADD COLUMN current_balance REAL DEFAULT 0.0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN scrap_value REAL DEFAULT 0.0`);
+  runMigration(`ALTER TABLE purchases ADD COLUMN transport_amount REAL DEFAULT 0.0`);
 
   // Seed default business settings if empty
   const defaultSettings = [

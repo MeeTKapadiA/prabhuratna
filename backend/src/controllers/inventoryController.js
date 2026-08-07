@@ -8,13 +8,22 @@ exports.adjustStock = (req, res) => {
       return res.status(400).json({ success: false, message: 'Product ID, quantity change, and change type are required' });
     }
 
+    const allowedChangeTypes = ['PURCHASE', 'MANUAL_ADJUSTMENT'];
+    if (!allowedChangeTypes.includes(change_type)) {
+      return res.status(400).json({ success: false, message: 'Invalid inventory change type' });
+    }
+
+    const qtyChange = parseInt(quantity_change, 10);
+    if (!Number.isFinite(qtyChange) || qtyChange === 0) {
+      return res.status(400).json({ success: false, message: 'Quantity change must be a non-zero number' });
+    }
+
     const product = db.prepare('SELECT stock_quantity FROM products WHERE id = ?').get(product_id);
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
     const prevStock = product.stock_quantity;
-    const qtyChange = parseInt(quantity_change);
     const newStock = prevStock + qtyChange;
 
     if (newStock < 0) {

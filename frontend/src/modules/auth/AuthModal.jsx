@@ -1,31 +1,22 @@
 import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
-import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
-import { Mail, Lock, User, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSuccess }) {
-  const [isLogin, setIsLogin] = useState(initialMode === 'login');
-  const [name, setName] = useState('');
+export default function AuthModal({ isOpen, onClose, onSuccess }) {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
-  const { login, register, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    let result;
-    if (isLogin) {
-      result = await login(loginIdentifier, password);
-    } else {
-      result = await register(name, loginIdentifier, password);
-    }
+    const result = await login(loginIdentifier, password);
 
     if (result && result.success) {
       onClose();
@@ -40,8 +31,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={isLogin ? 'Prabhuratna Enterprise ERP' : 'Create Management Account'}
-        subtitle={isLogin ? 'Sign in to access POS Billing, Products & Inventory' : 'Register a new authorized user'}
+        title="Prabhuratna Enterprise ERP"
+        subtitle="Sign in to access POS Billing, Products & Inventory"
         maxWidth="max-w-md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -51,24 +42,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
             </div>
           )}
 
-          {!isLogin && (
-            <Input
-              label="Full Name"
-              icon={User}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Rajesh Sharma"
-              required
-            />
-          )}
-
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF] mb-1">
+            <label htmlFor="login-identifier" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF] mb-1">
               Username or Email *
             </label>
             <div className="relative">
               <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400 dark:text-[#9CA3AF]" />
               <input
+                id="login-identifier"
                 type="text"
                 required
                 value={loginIdentifier}
@@ -80,12 +61,13 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF] mb-1">
+            <label htmlFor="login-password" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF] mb-1">
               Password *
             </label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400 dark:text-[#9CA3AF]" />
               <input
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
@@ -104,51 +86,28 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
             </div>
           </div>
 
-          {isLogin && (
-            <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-[#9CA3AF]">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-slate-300 dark:border-[#2D3138] text-[#C0392B] focus:ring-0"
-                />
-                <span>Remember Session</span>
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setForgotModalOpen(true)}
-                className="text-[#C0392B] dark:text-[#E74C3C] font-semibold hover:underline"
-              >
-                Forgot Password?
-              </button>
-            </div>
-          )}
-
-          <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
-            {isLogin ? 'Sign In to Portal' : 'Register Account'}
-          </Button>
-
-          <div className="text-center text-xs text-slate-500 dark:text-[#9CA3AF] pt-3 border-t border-slate-200 dark:border-[#2D3138] flex items-center justify-between">
-            <span className="flex items-center gap-1 text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Encrypted JWT Session
-            </span>
+          <div className="flex items-center justify-end text-xs pt-1">
             <button
               type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError('');
-              }}
+              onClick={() => setForgotModalOpen(true)}
               className="text-[#C0392B] dark:text-[#E74C3C] font-semibold hover:underline"
             >
-              {isLogin ? 'Need Account?' : 'Back to Login'}
+              Forgot Password?
             </button>
+          </div>
+
+          <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
+            Sign In to Portal
+          </Button>
+
+          <div className="text-center text-xs text-slate-500 dark:text-[#9CA3AF] pt-3 border-t border-slate-200 dark:border-[#2D3138]">
+            <span className="flex items-center justify-center gap-1 text-[11px]">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Encrypted JWT Session
+            </span>
           </div>
         </form>
       </Modal>
 
-      {/* Forgot Password Modal */}
       <Modal
         isOpen={forgotModalOpen}
         onClose={() => setForgotModalOpen(false)}

@@ -1,8 +1,9 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+const helmet = require('helmet');
 
-const db = require('./config/db');
+const { isProduction, port, allowedOrigins } = require('./config/env');
+require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
@@ -17,25 +18,33 @@ const returnRoutes = require('./routes/returnRoutes');
 const backupRoutes = require('./routes/backupRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const { apiLimiter } = require('./middleware/rateLimit');
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = port;
 
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
-
-// Dynamic CORS configuration supporting ALLOWED_ORIGINS env variable
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : null;
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow server-to-server or non-browser requests (no origin)
+    // Non-browser / same-server calls (no Origin header)
     if (!origin) return callback(null, true);
-    if (!allowedOrigins || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+
+    // Local development: allow all origins
+    if (!isProduction) {
       return callback(null, true);
     }
-    return callback(new Error('CORS policy check failed: Origin not allowed'));
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -44,10 +53,10 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ limit: '2mb', extended: true }));
+app.use('/api', apiLimiter);
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
@@ -64,7 +73,6 @@ app.use('/api/returns', returnRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/settings', settingsRoutes);
 
-// Root & Health Check
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',

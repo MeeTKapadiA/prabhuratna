@@ -1,5 +1,8 @@
 const db = require('../config/db');
 const { getFinancialYear } = require('../utils/fyHelper');
+const { roundMoney, processSaleItems } = require('../utils/saleItems');
+
+const ALLOWED_PAYMENT_MODES = new Set(['CASH', 'UPI', 'CARD', 'MIXED', 'CREDIT']);
 
 exports.createInvoice = (req, res) => {
   try {
@@ -7,11 +10,8 @@ exports.createInvoice = (req, res) => {
       customer_name,
       customer_phone,
       customer_email,
-      subtotal: rawSubtotal,
-      tax_amount: rawTaxAmount,
       discount_amount: rawDiscountAmount,
       scrap_value: rawScrapValue,
-      grand_total: rawGrandTotal,
       payment_mode,
       notes,
       items
@@ -21,58 +21,18 @@ exports.createInvoice = (req, res) => {
       return res.status(400).json({ success: false, message: 'Cart items are required to generate invoice' });
     }
 
-    if (!payment_mode) {
+    const normalizedPaymentMode = String(payment_mode || '').toUpperCase();
+    if (!ALLOWED_PAYMENT_MODES.has(normalizedPaymentMode)) {
       return res.status(400).json({ success: false, message: 'Payment mode is required' });
     }
 
-    // Auto-calculate totals if not passed or zero
-    let calcSubtotal = 0;
-    let calcTax = 0;
-    let calcDiscount = !isNaN(parseFloat(rawDiscountAmount)) ? parseFloat(rawDiscountAmount) : 0;
-    const rawScrap = !isNaN(parseFloat(rawScrapValue)) ? Math.max(0, parseFloat(rawScrapValue)) : 0;
+    const { processedItems, finalSubtotal, finalTax } = processSaleItems(items);
+    const requestedDiscount = Math.max(0, parseFloat(rawDiscountAmount) || 0);
+    const finalDiscount = roundMoney(Math.min(requestedDiscount, finalSubtotal + finalTax));
+    const finalScrap = roundMoney(Math.max(0, parseFloat(rawScrapValue) || 0));
+    const finalGrandTotal = Math.max(0, roundMoney(finalSubtotal + finalTax - finalDiscount - finalScrap));
 
-    const processedItems = items.map((item) => {
-      const uPrice = !isNaN(parseFloat(item.unit_price)) ? parseFloat(item.unit_price) : (!isNaN(parseFloat(item.selling_price)) ? parseFloat(item.selling_price) : 0);
-      const qty = !isNaN(parseInt(item.quantity)) ? parseInt(item.quantity) : 1;
-      const disc = !isNaN(parseFloat(item.discount_percent)) ? parseFloat(item.discount_percent) : 0;
-      const gst = !isNaN(parseFloat(item.gst_percent)) ? parseFloat(item.gst_percent) : 0;
-
-      const base = uPrice * qty;
-      const itemDisc = base * (disc / 100);
-      const afterDisc = base - itemDisc;
-      const itemGst = afterDisc * (gst / 100);
-      const itemTotal = !isNaN(parseFloat(item.total_price)) ? parseFloat(item.total_price) : Math.round((afterDisc + itemGst) * 100) / 100;
-
-      calcSubtotal += afterDisc;
-      calcTax += itemGst;
-
-      return {
-        ...item,
-        unit_price: uPrice,
-        quantity: qty,
-        discount_percent: disc,
-        gst_percent: gst,
-        total_price: itemTotal
-      };
-    });
-
-    const parsedSubtotal = parseFloat(rawSubtotal);
-    const finalSubtotal = !isNaN(parsedSubtotal) && parsedSubtotal >= 0 ? Math.round(parsedSubtotal * 100) / 100 : Math.round(calcSubtotal * 100) / 100;
-
-    const parsedTax = parseFloat(rawTaxAmount);
-    const finalTax = !isNaN(parsedTax) && parsedTax >= 0 ? Math.round(parsedTax * 100) / 100 : Math.round(calcTax * 100) / 100;
-
-    const parsedDiscount = parseFloat(rawDiscountAmount);
-    const finalDiscount = !isNaN(parsedDiscount) && parsedDiscount >= 0 ? Math.round(parsedDiscount * 100) / 100 : Math.round(calcDiscount * 100) / 100;
-
-    const finalScrap = rawScrap;
-
-    const calculatedGrand = Math.max(0, Math.round((finalSubtotal + finalTax - finalDiscount - finalScrap) * 100) / 100);
-    const parsedGrandTotal = parseFloat(rawGrandTotal);
-    const finalGrandTotal = !isNaN(parsedGrandTotal) && parsedGrandTotal > 0 ? Math.round(parsedGrandTotal * 100) / 100 : calculatedGrand;
-
-    // Safeguard: Block checkout if grand_total is NaN or <= 0
-    if (isNaN(finalGrandTotal) || finalGrandTotal <= 0) {
+    if (!Number.isFinite(finalGrandTotal) || finalGrandTotal <= 0) {
       return res.status(400).json({
         success: false,
         message: 'Invoice grand total is invalid or ₹0. Please check items and pricing before proceeding.'
@@ -117,7 +77,7 @@ exports.createInvoice = (req, res) => {
         finalDiscount,
         finalScrap,
         finalGrandTotal,
-        payment_mode,
+        normalizedPaymentMode,
         notes || ''
       );
 
@@ -158,7 +118,12 @@ exports.createInvoice = (req, res) => {
           if (prod) {
             const prevStock = prod.stock_quantity;
             const newStock = prevStock - item.quantity;
-            
+            if (newStock < 0) {
+              const error = new Error(`Insufficient stock for ${item.product_name}`);
+              error.statusCode = 400;
+              throw error;
+            }
+
             updateStockStmt.run(item.quantity, item.product_id);
             logStmt.run(item.product_id, -item.quantity, prevStock, newStock, `Sold in invoice ${invoiceNumber}`);
           }
@@ -184,7 +149,10 @@ exports.createInvoice = (req, res) => {
     });
   } catch (error) {
     console.error('Error creating invoice:', error);
-    return res.status(500).json({ success: false, message: 'Failed to create invoice' });
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode === 400 ? error.message : 'Failed to create invoice'
+    });
   }
 };
 

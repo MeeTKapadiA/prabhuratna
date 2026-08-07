@@ -59,7 +59,11 @@ exports.createUser = (req, res) => {
       return res.status(400).json({ success: false, message: 'User with this email or username already exists.' });
     }
 
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    if (String(password).length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 12);
     const result = db.prepare(`
       INSERT INTO users (name, username, email, password, role, status)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -84,9 +88,26 @@ exports.updateUser = (req, res) => {
     const { id } = req.params;
     const { name, username, email, role, status } = req.body;
 
-    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    let finalRole = user.role;
+    if (role !== undefined && role !== null) {
+      finalRole = role === 'admin' ? 'admin' : 'staff';
+    }
+
+    let finalStatus = null;
+    if (status !== undefined && status !== null) {
+      finalStatus = status === 'inactive' ? 'inactive' : 'active';
+    }
+
+    if (user.role === 'admin' && finalRole !== 'admin') {
+      const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND status = 'active'").get();
+      if (adminCount.count <= 1) {
+        return res.status(400).json({ success: false, message: 'Cannot demote the last active administrator.' });
+      }
     }
 
     // Check duplicate email/username for other users
@@ -102,10 +123,10 @@ exports.updateUser = (req, res) => {
       SET name = COALESCE(?, name),
           username = COALESCE(?, username),
           email = COALESCE(?, email),
-          role = COALESCE(?, role),
+          role = ?,
           status = COALESCE(?, status)
       WHERE id = ?
-    `).run(name, username, email, role, status, id);
+    `).run(name, username, email, finalRole, finalStatus, id);
 
     const updatedUser = db.prepare('SELECT id, name, username, email, role, status, last_login, created_at FROM users WHERE id = ?').get(id);
 
@@ -130,9 +151,15 @@ exports.toggleUserStatus = (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Prevent self-deactivation if last admin
     if (user.id === req.user.id) {
       return res.status(400).json({ success: false, message: 'You cannot deactivate your own account.' });
+    }
+
+    if (user.role === 'admin' && user.status === 'active') {
+      const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND status = 'active'").get();
+      if (adminCount.count <= 1) {
+        return res.status(400).json({ success: false, message: 'Cannot deactivate the last active administrator.' });
+      }
     }
 
     const newStatus = user.status === 'active' ? 'inactive' : 'active';
@@ -153,7 +180,7 @@ exports.toggleUserStatus = (req, res) => {
 exports.resetPassword = (req, res) => {
   try {
     const { id } = req.params;
-    const { newPassword } = req.body;
+    const newPassword = req.body.newPassword || req.body.password;
 
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
@@ -164,7 +191,7 @@ exports.resetPassword = (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    const hashedPassword = bcrypt.hashSync(newPassword, 12);
     db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, id);
 
     return res.json({
@@ -186,9 +213,16 @@ exports.deleteUser = (req, res) => {
       return res.status(400).json({ success: false, message: 'You cannot delete your own account.' });
     }
 
-    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, role, status FROM users WHERE id = ?').get(id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND status = 'active'").get();
+      if (adminCount.count <= 1) {
+        return res.status(400).json({ success: false, message: 'Cannot delete the last active administrator.' });
+      }
     }
 
     db.prepare('DELETE FROM users WHERE id = ?').run(id);

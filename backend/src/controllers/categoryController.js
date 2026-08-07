@@ -2,17 +2,7 @@ const db = require('../config/db');
 
 exports.getAllCategories = (req, res) => {
   try {
-    // Ensure all categories used in products exist in categories table
-    const productCategories = db.prepare("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != ''").all();
-    const insertStmt = db.prepare('INSERT INTO categories (name) VALUES (?) ON CONFLICT(name) DO NOTHING');
-    
-    productCategories.forEach(p => {
-      if (p.category && p.category.trim()) {
-        insertStmt.run(p.category.trim());
-      }
-    });
-
-    const categories = db.prepare('SELECT * FROM categories ORDER BY name ASC').all();
+    const categories = db.prepare('SELECT id, name, created_at FROM categories ORDER BY name ASC').all();
     return res.json({ success: true, count: categories.length, categories });
   } catch (error) {
     console.error('Error fetching categories:', error);

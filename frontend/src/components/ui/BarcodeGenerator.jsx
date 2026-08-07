@@ -89,6 +89,13 @@ export default function BarcodeGenerator({
     }
   };
 
+  const escapeHtml = (valueToEscape) => String(valueToEscape ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
   const handlePrintLabel = () => {
     let codeImgHtml = '';
     if (codeType === '1d' && svgRef.current) {
@@ -99,12 +106,15 @@ export default function BarcodeGenerator({
       codeImgHtml = `<img src="${qrUrl}" style="width:140px;height:140px;margin:6px auto;display:block;" />`;
     }
 
+    const safeName = escapeHtml(productName);
+    const safeSku = escapeHtml(sku);
+    const safeValue = escapeHtml(value);
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Print Label - ${productName || value}</title>
+          <title>Print Label - ${safeName || safeValue}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -153,8 +163,8 @@ export default function BarcodeGenerator({
         <body onload="window.print(); window.close();">
           <div class="label-box">
             <div class="store-name">PRABHURATNA METALS</div>
-            <div class="product-name">${productName}</div>
-            ${sku ? `<div class="sku-info">SKU: ${sku} | Barcode: ${value}</div>` : ''}
+            <div class="product-name">${safeName}</div>
+            ${safeSku ? `<div class="sku-info">SKU: ${safeSku} | Barcode: ${safeValue}</div>` : ''}
             ${codeImgHtml}
             ${price ? `<div class="price">MRP: ${formatCurrency(price)}</div>` : ''}
           </div>

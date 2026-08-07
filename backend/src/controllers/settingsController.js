@@ -1,13 +1,27 @@
 const db = require('../config/db');
 
+const ALLOWED_SETTING_KEYS = [
+  'shop_name',
+  'shop_address',
+  'shop_phone',
+  'shop_email',
+  'shop_gstin',
+  'logo_base64',
+  'invoice_footer_note'
+];
+
+function readSettings() {
+  const rows = db.prepare('SELECT key, value FROM settings').all();
+  const settings = {};
+  rows.forEach((row) => {
+    settings[row.key] = row.value;
+  });
+  return settings;
+}
+
 exports.getSettings = (req, res) => {
   try {
-    const rows = db.prepare('SELECT key, value FROM settings').all();
-    const settings = {};
-    rows.forEach((row) => {
-      settings[row.key] = row.value;
-    });
-    return res.json({ success: true, settings });
+    return res.json({ success: true, settings: readSettings() });
   } catch (error) {
     console.error('Error fetching settings:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch settings' });
@@ -17,7 +31,7 @@ exports.getSettings = (req, res) => {
 exports.updateSettings = (req, res) => {
   try {
     const payload = req.body.settings || req.body;
-    if (!payload || typeof payload !== 'object') {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       return res.status(400).json({ success: false, message: 'Invalid settings payload' });
     }
 
@@ -29,19 +43,14 @@ exports.updateSettings = (req, res) => {
 
     const updateTransaction = db.transaction(() => {
       for (const [key, value] of Object.entries(payload)) {
+        if (!ALLOWED_SETTING_KEYS.includes(key)) continue;
         stmt.run(key, typeof value === 'string' ? value : String(value || ''));
       }
     });
 
     updateTransaction();
 
-    const rows = db.prepare('SELECT key, value FROM settings').all();
-    const settings = {};
-    rows.forEach((row) => {
-      settings[row.key] = row.value;
-    });
-
-    return res.json({ success: true, message: 'Business settings saved successfully', settings });
+    return res.json({ success: true, message: 'Business settings saved successfully', settings: readSettings() });
   } catch (error) {
     console.error('Error updating settings:', error);
     return res.status(500).json({ success: false, message: 'Failed to update settings' });

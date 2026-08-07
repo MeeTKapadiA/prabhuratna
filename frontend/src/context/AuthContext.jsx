@@ -5,8 +5,13 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('prabhuratna_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('prabhuratna_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      localStorage.removeItem('prabhuratna_user');
+      return null;
+    }
   });
   const [token, setToken] = useState(() => localStorage.getItem('prabhuratna_token') || null);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,24 +69,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (name, email, password, username, userRole = 'staff') => {
-    setIsLoading(true);
-    try {
-      const res = await apiRequest('/auth/register', 'POST', { name, email, password, username, role: userRole });
-      if (res.success) {
-        setToken(res.token);
-        setUser(res.user);
-        localStorage.setItem('prabhuratna_token', res.token);
-        localStorage.setItem('prabhuratna_user', JSON.stringify(res.user));
-        return { success: true, user: res.user };
-      }
-    } catch (err) {
-      return { success: false, message: err.message };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -98,7 +85,6 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!token,
       isLoading,
       login,
-      register,
       logout,
       hasPermission
     }}>

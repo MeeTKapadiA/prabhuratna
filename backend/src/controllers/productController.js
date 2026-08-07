@@ -53,7 +53,13 @@ exports.getAllProducts = (req, res) => {
 
 exports.getPublicCatalogProducts = (req, res) => {
   try {
-    const products = db.prepare('SELECT * FROM products WHERE is_active = 1 AND show_on_website = 1 ORDER BY id DESC').all();
+    const products = db.prepare(`
+      SELECT id, name, sku, category, brand, selling_price, gst_percent, image_url,
+             CASE WHEN stock_quantity > 0 THEN 1 ELSE 0 END AS in_stock
+      FROM products
+      WHERE is_active = 1 AND show_on_website = 1
+      ORDER BY id DESC
+    `).all();
     return res.json({ success: true, count: products.length, products });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch public catalog products' });
