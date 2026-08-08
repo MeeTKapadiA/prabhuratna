@@ -9,6 +9,7 @@ import { apiRequest } from '../../services/api';
 import { setupBarcodeScanner } from '../../services/barcodeScanner';
 import { calculateCartTotals, formatCurrency } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
+import { useShopSettings } from '../../context/ShopSettingsContext';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
 import {
   ScanBarcode,
@@ -25,22 +26,33 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import BarcodeCameraScannerModal from '../../components/ui/BarcodeCameraScannerModal';
+import { enqueueInvoice, flushQueue, getQueue, isOnline } from '../../services/offlineQueue';
 
 export default function BillingPage() {
+  const { settings: shopSettings, refreshSettings } = useShopSettings();
   const [cartItems, setCartItems] = useState([]);
   const [manualSearch, setManualSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
+  const [isCustomItemOpen, setIsCustomItemOpen] = useState(false);
+  const [customItem, setCustomItem] = useState({
+    product_name: '', unit_price: '', quantity: 1, gst_percent: 18, hsn_sac: '', unit: 'pcs'
+  });
   
   // Checkout & Customer State
   const [customerName, setCustomerName] = useState('Walk-in Customer');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
-  const [paymentMode, setPaymentMode] = useState('CASH'); // CASH, UPI, CARD, MIXED
+  const [customerGstin, setCustomerGstin] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [paymentMode, setPaymentMode] = useState('CASH'); // CASH, UPI, CARD, MIXED, CREDIT
+  const [amountPaid, setAmountPaid] = useState('');
   const [overallDiscount, setOverallDiscount] = useState(0);
   const [scrapValue, setScrapValue] = useState(0);
+  const [transportAmount, setTransportAmount] = useState(0);
   const [notes, setNotes] = useState('');
+  const [offlineCount, setOfflineCount] = useState(() => getQueue().length);
 
   // Post Checkout Invoice Modal
   const [completedInvoice, setCompletedInvoice] = useState(null);
@@ -49,14 +61,38 @@ export default function BillingPage() {
   const [toast, setToast] = useState({ isOpen: false, type: 'info', message: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [settings, setSettings] = useState({});
+  const [apiDown, setApiDown] = useState(false);
 
   useEffect(() => {
-    apiRequest('/settings').then((res) => {
-      if (res && res.success && res.settings) {
-        setSettings(res.settings);
-      }
-    }).catch(() => {});
+    if (shopSettings && Object.keys(shopSettings).length) {
+      setSettings(shopSettings);
+      setApiDown(false);
+    }
+  }, [shopSettings]);
+
+  useEffect(() => {
+    refreshSettings().catch(() => setApiDown(true));
+
+    if (isOnline()) {
+      flushQueue(apiRequest).then((result) => {
+        if (result.synced > 0) {
+          setOfflineCount(getQueue().length);
+          setToast({ isOpen: true, type: 'success', message: `Synced ${result.synced} offline invoice(s)` });
+        }
+      }).catch(() => {});
+    }
   }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        handleCheckout();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const showToast = (message, type = 'success') => {
     setToast({ isOpen: true, type, message });
@@ -163,15 +199,47 @@ export default function BillingPage() {
             product_name: product.name,
             barcode: product.barcode,
             sku: product.sku,
+            hsn_sac: product.hsn_sac || '',
+            unit: product.unit || 'pcs',
+            size_variant: product.size_variant || '',
+            gauge: product.gauge || '',
             unit_price: product.selling_price,
             quantity: 1,
             discount_percent: product.discount_percent || 0,
             gst_percent: product.gst_percent || 18,
-            max_stock: product.stock_quantity
+            max_stock: product.stock_quantity,
+            is_custom: false
           }
         ];
       }
     });
+  };
+
+  const addCustomItem = () => {
+    if (!customItem.product_name.trim() || !(Number(customItem.unit_price) > 0)) {
+      showToast('Enter custom item name and price', 'error');
+      return;
+    }
+    setCartItems((prev) => [
+      ...prev,
+      {
+        product_id: null,
+        product_name: customItem.product_name.trim(),
+        barcode: '',
+        sku: 'CUSTOM',
+        hsn_sac: customItem.hsn_sac || '',
+        unit: customItem.unit || 'pcs',
+        unit_price: Number(customItem.unit_price) || 0,
+        quantity: Number(customItem.quantity) || 1,
+        discount_percent: 0,
+        gst_percent: Number(customItem.gst_percent) || 18,
+        max_stock: 999999,
+        is_custom: true
+      }
+    ]);
+    setCustomItem({ product_name: '', unit_price: '', quantity: 1, gst_percent: 18, hsn_sac: '', unit: 'pcs' });
+    setIsCustomItemOpen(false);
+    showToast('Custom item added to cart', 'success');
   };
 
   const updateQuantity = (idx, newQty) => {
@@ -210,6 +278,8 @@ export default function BillingPage() {
   };
 
   const cartTotals = calculateCartTotals(cartItems, overallDiscount, scrapValue);
+  const transportVal = Math.max(0, parseFloat(transportAmount) || 0);
+  const displayGrand = Math.max(0, Math.round((cartTotals.grandTotal + transportVal) * 100) / 100);
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
@@ -217,63 +287,110 @@ export default function BillingPage() {
       return;
     }
 
-    if (isNaN(cartTotals.grandTotal) || cartTotals.grandTotal <= 0) {
+    if (isNaN(displayGrand) || displayGrand <= 0) {
       showToast('Checkout blocked: Invoice Grand Total is ₹0 or invalid. Please check cart items and pricing.', 'error');
       return;
     }
 
     setIsLoading(true);
     try {
+      const paid = amountPaid === '' || amountPaid === null
+        ? (paymentMode === 'CREDIT' ? 0 : displayGrand)
+        : Math.max(0, parseFloat(amountPaid) || 0);
+
       const payload = {
         customer_name: customerName,
         customer_phone: customerPhone,
         customer_email: customerEmail,
+        customer_gstin: customerGstin,
+        customer_address: customerAddress,
         payment_mode: paymentMode,
-        subtotal: cartTotals.subtotal,
-        tax_amount: cartTotals.taxAmount,
-        discount_amount: cartTotals.totalDiscount,
+        amount_paid: paid,
+        discount_amount: cartTotals.billDiscountAmount,
         scrap_value: cartTotals.scrapValue,
-        grand_total: cartTotals.grandTotal,
+        transport_amount: transportVal,
         notes,
-        items: cartItems.map((item) => {
-          const uPrice = parseFloat(item.unit_price) || 0;
-          const qty = parseInt(item.quantity) || 1;
-          const disc = parseFloat(item.discount_percent) || 0;
-          const gst = parseFloat(item.gst_percent) || 0;
-          const base = uPrice * qty;
-          const itemDisc = base * (disc / 100);
-          const afterDisc = base - itemDisc;
-          const itemGst = afterDisc * (gst / 100);
-          const totalP = Math.round((afterDisc + itemGst) * 100) / 100;
-          return {
-            product_id: item.product_id || item.id || null,
-            product_name: item.product_name || item.name,
-            barcode: item.barcode || '',
-            unit_price: uPrice,
-            quantity: qty,
-            discount_percent: disc,
-            gst_percent: gst,
-            total_price: totalP
-          };
-        })
+        items: cartItems.map((item) => ({
+          product_id: item.is_custom ? null : (item.product_id || item.id || null),
+          product_name: item.product_name || item.name,
+          barcode: item.barcode || '',
+          hsn_sac: item.hsn_sac || '',
+          unit: item.unit || 'pcs',
+          size_variant: item.size_variant || '',
+          gauge: item.gauge || '',
+          unit_price: parseFloat(item.unit_price) || 0,
+          quantity: parseFloat(item.quantity) || 1,
+          discount_percent: parseFloat(item.discount_percent) || 0,
+          gst_percent: parseFloat(item.gst_percent) || 0,
+          is_custom: Boolean(item.is_custom)
+        }))
       };
+
+      if (!isOnline()) {
+        enqueueInvoice(payload);
+        setOfflineCount(getQueue().length);
+        setCartItems([]);
+        showToast('Offline — invoice queued. Will sync when internet returns.', 'warning');
+        return;
+      }
 
       const res = await apiRequest('/billing/invoices', 'POST', payload);
       if (res.success) {
         setCompletedInvoice(res.invoice);
         setIsInvoiceModalOpen(true);
-        // Reset Cart
         setCartItems([]);
         setCustomerName('Walk-in Customer');
         setCustomerPhone('');
         setCustomerEmail('');
+        setCustomerGstin('');
+        setCustomerAddress('');
         setOverallDiscount(0);
         setScrapValue(0);
+        setTransportAmount(0);
+        setAmountPaid('');
         setNotes('');
-        showToast('Invoice generated successfully!', 'success');
+        setApiDown(false);
+        if (res.low_stock_alerts?.length) {
+          showToast(`${res.low_stock_alerts.length} product(s) are low on stock`, 'warning');
+        } else {
+          showToast('GST invoice generated successfully!', 'success');
+        }
       }
     } catch (err) {
-      showToast(err.message || 'Failed to complete transaction', 'error');
+      if (!isOnline() || /Network Error|Failed to fetch/i.test(err.message || '')) {
+        const payload = {
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          customer_email: customerEmail,
+          customer_gstin: customerGstin,
+          customer_address: customerAddress,
+          payment_mode: paymentMode,
+          amount_paid: paymentMode === 'CREDIT' ? 0 : displayGrand,
+          discount_amount: cartTotals.billDiscountAmount,
+          scrap_value: cartTotals.scrapValue,
+          transport_amount: transportVal,
+          notes,
+          items: cartItems.map((item) => ({
+            product_id: item.is_custom ? null : (item.product_id || null),
+            product_name: item.product_name,
+            barcode: item.barcode || '',
+            hsn_sac: item.hsn_sac || '',
+            unit: item.unit || 'pcs',
+            unit_price: parseFloat(item.unit_price) || 0,
+            quantity: parseFloat(item.quantity) || 1,
+            discount_percent: parseFloat(item.discount_percent) || 0,
+            gst_percent: parseFloat(item.gst_percent) || 0,
+            is_custom: Boolean(item.is_custom)
+          }))
+        };
+        enqueueInvoice(payload);
+        setOfflineCount(getQueue().length);
+        setCartItems([]);
+        setApiDown(true);
+        showToast('API unreachable — invoice saved offline queue', 'warning');
+      } else {
+        showToast(err.message || 'Failed to complete transaction', 'error');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -287,24 +404,26 @@ export default function BillingPage() {
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-[#C0392B] dark:text-[#E74C3C]" /> Express POS Counter Billing
           </h2>
-          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">High-speed barcode scanner billing, automated GST calculation, and instant invoices</p>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">
+            Scan barcode first · Enter adds item · F2 checkout · Custom item if not in catalog
+            {offlineCount > 0 ? ` · ${offlineCount} offline queued` : ''}
+          </p>
+          {apiDown && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-semibold">
+              API connection issue — billing will queue offline until sync.
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setIsCameraScannerOpen(true)}
-            variant="secondary"
-            icon={Camera}
-          >
-            Camera Scanner
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setIsCameraScannerOpen(true)} variant="secondary" icon={Camera}>
+            Camera
           </Button>
-
-          <Button
-            onClick={() => setIsSearchModalOpen(true)}
-            variant="primary"
-            icon={Search}
-          >
-            Search Catalog
+          <Button onClick={() => setIsCustomItemOpen(true)} variant="secondary" icon={Plus}>
+            Custom Item
+          </Button>
+          <Button onClick={() => setIsSearchModalOpen(true)} variant="primary" icon={Search}>
+            Search
           </Button>
         </div>
       </div>
@@ -531,36 +650,78 @@ export default function BillingPage() {
 
             {/* Customer & Billing Inputs */}
             <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
                   label="Customer Name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Walk-in Customer"
+                  className="min-w-0"
                 />
                 <Input
                   label="Phone Number"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   placeholder="10-digit Mobile"
+                  className="min-w-0"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  label="Overall Disc (%)"
-                  type="number"
-                  value={overallDiscount}
-                  onChange={(e) => setOverallDiscount(e.target.value)}
-                  placeholder="0"
-                />
-                <Input
-                  label="Exchange / Scrap (₹)"
-                  type="number"
-                  value={scrapValue}
-                  onChange={(e) => setScrapValue(e.target.value)}
-                  placeholder="0 (Old item exchange)"
-                />
+              <Input
+                label="Customer GSTIN (B2B)"
+                value={customerGstin}
+                onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
+                placeholder="Optional 15-char GSTIN"
+                className="min-w-0"
+              />
+
+              <Input
+                label="Billing Address"
+                type="textarea"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="Billing address"
+                className="min-w-0"
+                rows={2}
+              />
+
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="min-w-0">
+                  <Input
+                    label="Disc %"
+                    type="number"
+                    value={overallDiscount}
+                    onChange={(e) => setOverallDiscount(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                    className="min-w-0 [&_input]:min-w-0 [&_input]:appearance-none"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <Input
+                    label="Scrap ₹"
+                    type="number"
+                    value={scrapValue}
+                    onChange={(e) => setScrapValue(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                    className="min-w-0 [&_input]:min-w-0"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <Input
+                    label="Transport ₹"
+                    type="number"
+                    value={transportAmount}
+                    onChange={(e) => setTransportAmount(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                    className="min-w-0 [&_input]:min-w-0"
+                  />
+                </div>
               </div>
             </div>
 
@@ -569,12 +730,13 @@ export default function BillingPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
                 Payment Mode
               </label>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                 {[
                   { id: 'CASH', label: 'Cash', icon: DollarSign },
-                  { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                  { id: 'UPI', label: 'UPI', icon: QrCode },
                   { id: 'CARD', label: 'Card', icon: CreditCard },
-                  { id: 'MIXED', label: 'Split', icon: Plus }
+                  { id: 'MIXED', label: 'Split', icon: Plus },
+                  { id: 'CREDIT', label: 'Udhaar', icon: CreditCard }
                 ].map((mode) => {
                   const Icon = mode.icon;
                   const isSelected = paymentMode === mode.id;
@@ -583,14 +745,14 @@ export default function BillingPage() {
                       key={mode.id}
                       type="button"
                       onClick={() => setPaymentMode(mode.id)}
-                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-bold border transition-all ${
+                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-bold border transition-all min-w-0 ${
                         isSelected
                           ? 'bg-[#C0392B]/10 dark:bg-[#E74C3C]/10 border-[#C0392B] dark:border-[#E74C3C] text-[#C0392B] dark:text-[#E74C3C]'
                           : 'bg-white dark:bg-[#121417] border-slate-200 dark:border-[#2D3138] text-slate-600 dark:text-[#9CA3AF] hover:bg-slate-100 dark:hover:bg-[#1E2126]'
                       }`}
                     >
-                      <Icon className="w-4 h-4 mb-1" />
-                      <span>{mode.label}</span>
+                      <Icon className="w-4 h-4 mb-1 shrink-0" />
+                      <span className="truncate w-full text-center">{mode.label}</span>
                     </button>
                   );
                 })}
@@ -608,9 +770,15 @@ export default function BillingPage() {
                 <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.itemDiscountsTotal)}</span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
-                <span>Estimated Tax (GST):</span>
+                <span>GST (CGST/SGST or IGST):</span>
                 <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(cartTotals.taxAmount)}</span>
               </div>
+              {transportVal > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                  <span>Transport:</span>
+                  <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(transportVal)}</span>
+                </div>
+              )}
               {cartTotals.billDiscountAmount > 0 && (
                 <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
                   <span>Flat Cash Discount:</span>
@@ -626,12 +794,19 @@ export default function BillingPage() {
               <div className="pt-2 border-t border-slate-200 dark:border-[#2D3138] flex justify-between items-center text-sm">
                 <span className="font-extrabold text-slate-900 dark:text-[#F1F1F1]">Grand Total:</span>
                 <span className="text-xl font-extrabold text-[#C0392B] dark:text-[#E74C3C]">
-                  {formatCurrency(cartTotals.grandTotal)}
+                  {formatCurrency(displayGrand)}
                 </span>
               </div>
             </div>
 
-            {/* Complete Checkout CTA Button */}
+            <Input
+              label={paymentMode === 'CREDIT' ? 'Amount Paid Now (Udhaar)' : 'Amount Paid (partial OK)'}
+              type="number"
+              value={amountPaid}
+              onChange={(e) => setAmountPaid(e.target.value)}
+              placeholder={String(displayGrand)}
+            />
+
             <Button
               onClick={handleCheckout}
               variant="primary"
@@ -641,7 +816,7 @@ export default function BillingPage() {
               disabled={cartItems.length === 0}
               icon={CheckCircle}
             >
-              Complete Sale & Print Receipt
+              Complete Sale (F2)
             </Button>
           </div>
         </div>
@@ -767,6 +942,62 @@ export default function BillingPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={isCustomItemOpen}
+        onClose={() => setIsCustomItemOpen(false)}
+        title="Add Custom / Unlisted Item"
+        subtitle="Use when the product is not in the catalog"
+      >
+        <div className="space-y-3">
+          <Input
+            label="Item Name *"
+            value={customItem.product_name}
+            onChange={(e) => setCustomItem({ ...customItem, product_name: e.target.value })}
+            placeholder="e.g. Brass Fitting 1 inch"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              label="Rate *"
+              type="number"
+              value={customItem.unit_price}
+              onChange={(e) => setCustomItem({ ...customItem, unit_price: e.target.value })}
+            />
+            <Input
+              label="Qty"
+              type="number"
+              value={customItem.quantity}
+              onChange={(e) => setCustomItem({ ...customItem, quantity: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              label="GST %"
+              type="number"
+              value={customItem.gst_percent}
+              onChange={(e) => setCustomItem({ ...customItem, gst_percent: e.target.value })}
+            />
+            <Input
+              label="HSN"
+              value={customItem.hsn_sac}
+              onChange={(e) => setCustomItem({ ...customItem, hsn_sac: e.target.value })}
+            />
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF] mb-1">Unit</label>
+              <select
+                value={customItem.unit}
+                onChange={(e) => setCustomItem({ ...customItem, unit: e.target.value })}
+                className="w-full px-3 py-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-xs"
+              >
+                {['pcs', 'kg', 'set', 'box', 'meter', 'pair'].map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <Button onClick={addCustomItem} variant="primary" fullWidth icon={Plus}>Add to Cart</Button>
+        </div>
       </Modal>
 
       <Toast

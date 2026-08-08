@@ -93,7 +93,74 @@ async function run() {
       path: '/api/users',
       token: 'not-a-real-jwt'
     });
-    assert(fakeAdmin.status === 403, `Forged token is rejected (got ${fakeAdmin.status})`);
+    assert(fakeAdmin.status === 401, `Forged token is rejected (got ${fakeAdmin.status})`);
+
+    const products = await request(server, {
+      path: '/api/products?activeOnly=true',
+      token: adminLogin.json.token
+    });
+    const sample = products.json?.products?.[0];
+    assert(Boolean(sample), 'Can load products for GST invoice test');
+
+    const invoice = await request(server, {
+      method: 'POST',
+      path: '/api/billing/invoices',
+      token: adminLogin.json.token,
+      body: {
+        customer_name: 'Smoke Test Customer',
+        customer_gstin: '24ABCDE1234F1Z5',
+        payment_mode: 'CASH',
+        items: [
+          {
+            product_id: sample.id,
+            product_name: sample.name,
+            unit_price: sample.selling_price,
+            quantity: 1,
+            gst_percent: sample.gst_percent || 18,
+            hsn_sac: sample.hsn_sac || '7323',
+            unit: sample.unit || 'pcs'
+          },
+          {
+            product_id: null,
+            product_name: 'Custom Fitting',
+            unit_price: 100,
+            quantity: 1,
+            gst_percent: 18,
+            is_custom: true,
+            hsn_sac: '9999',
+            unit: 'pcs'
+          }
+        ]
+      }
+    });
+    assert(invoice.status === 201 && invoice.json?.invoice?.cgst_amount >= 0, `GST invoice create works (got ${invoice.status})`);
+    assert(invoice.json?.invoice?.tax_type === 'CGST_SGST' || invoice.json?.invoice?.tax_type === 'IGST', 'Invoice has tax_type');
+
+    const customOnly = await request(server, {
+      method: 'POST',
+      path: '/api/billing/invoices',
+      token: staffLogin.json.token,
+      body: {
+        customer_name: 'Walk-in',
+        payment_mode: 'UPI',
+        items: [{ product_name: 'Loose Item', unit_price: 50, quantity: 2, gst_percent: 18, is_custom: true }]
+      }
+    });
+    assert(customOnly.status === 201, `Custom-only invoice works (got ${customOnly.status})`);
+
+    const staffDash = await request(server, {
+      path: '/api/dashboard/stats',
+      token: staffLogin.json.token
+    });
+    assert(staffDash.status === 200 && staffDash.json?.success, 'Staff can load dashboard');
+
+    const expensesBlocked = await request(server, {
+      method: 'POST',
+      path: '/api/expenses',
+      token: staffLogin.json.token,
+      body: { category: 'Rent', amount: 100 }
+    });
+    assert(expensesBlocked.status === 403, `Staff cannot create expenses (got ${expensesBlocked.status})`);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

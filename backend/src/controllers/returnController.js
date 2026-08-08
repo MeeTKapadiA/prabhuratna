@@ -84,12 +84,10 @@ exports.createReturn = (req, res) => {
         );
 
         if (item.product_id) {
-          const prod = db.prepare('SELECT stock_quantity FROM products WHERE id = ?').get(item.product_id);
+          const prod = db.prepare('SELECT stock_quantity, damaged_stock FROM products WHERE id = ?').get(item.product_id);
           if (prod) {
-            const prevStock = prod.stock_quantity;
-
             if (!isDamaged) {
-              // Restock item
+              const prevStock = prod.stock_quantity;
               const newStock = prevStock + qty;
               updateStockStmt.run(qty, item.product_id);
               logStmt.run(
@@ -101,14 +99,17 @@ exports.createReturn = (req, res) => {
                 `Returned in ${returnNumber}`
               );
             } else {
-              // Damaged item - do not restock
+              const prevDamaged = Number(prod.damaged_stock) || 0;
+              const newDamaged = prevDamaged + qty;
+              db.prepare('UPDATE products SET damaged_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+                .run(newDamaged, item.product_id);
               logStmt.run(
                 item.product_id,
                 'RETURN_DAMAGED',
-                0,
-                prevStock,
-                prevStock,
-                `Damaged item returned in ${returnNumber} (not restocked)`
+                qty,
+                prevDamaged,
+                newDamaged,
+                `Damaged return ${returnNumber} → damaged bucket`
               );
             }
           }

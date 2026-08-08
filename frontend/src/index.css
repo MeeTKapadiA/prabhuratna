@@ -30,11 +30,23 @@ html.dark {
     color: var(--color-text) !important;
     font-family: 'Inter', sans-serif;
     transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out;
+    overscroll-behavior-x: none;
+  }
+
+  #root {
+    min-height: 100%;
   }
   
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', sans-serif;
   }
+}
+
+/* Keep ERP chrome (sidebar/nav) fixed; only the main pane scrolls/swipes */
+.app-shell-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 /* Custom Scrollbars */

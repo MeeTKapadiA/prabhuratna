@@ -3,6 +3,30 @@ import 'jspdf-autotable';
 
 const BRAND_COLOR = [192, 57, 43]; // #C0392B (Prabhuratna Red/Maroon)
 
+function resolveLogoFormat(logoSrc = '') {
+  const src = String(logoSrc).toLowerCase();
+  if (src.includes('image/jpeg') || src.includes('image/jpg') || src.endsWith('.jpg') || src.endsWith('.jpeg')) {
+    return 'JPEG';
+  }
+  if (src.includes('image/webp') || src.endsWith('.webp')) {
+    return 'WEBP';
+  }
+  return 'PNG';
+}
+
+function drawShopLogo(doc, settings = {}) {
+  // Uploaded base64 from Business Settings is the reliable PDF source
+  const logoSrc = settings.logo_base64 || '';
+  if (!logoSrc) return false;
+  try {
+    doc.addImage(logoSrc, resolveLogoFormat(logoSrc), 14, 4, 20, 20);
+    return true;
+  } catch (e) {
+    console.error('Failed to render logo in PDF:', e);
+    return false;
+  }
+}
+
 /**
  * PDF-specific currency formatter using 'Rs. ' prefix instead of '₹'
  * to avoid broken character glyphs in jsPDF default Helvetica font.
@@ -25,7 +49,6 @@ export function generateInvoicePDF(invoice, options = {}) {
   const shopPhone = settings.shop_phone || '+91 98765 43210';
   const shopEmail = settings.shop_email || 'info@prabhuratna.com';
   const footerNote = settings.invoice_footer_note || 'Thank you for shopping with us! Visit again.';
-  const logoBase64 = settings.logo_base64 || '';
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -37,15 +60,8 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setFillColor(...BRAND_COLOR);
   doc.rect(0, 0, 210, 28, 'F');
 
-  if (logoBase64) {
-    try {
-      doc.addImage(logoBase64, 'PNG', 14, 4, 20, 20);
-    } catch (e) {
-      console.error('Failed to render logo in PDF:', e);
-    }
-  }
-
-  const titleX = logoBase64 ? 38 : 14;
+  const hasLogo = drawShopLogo(doc, settings);
+  const titleX = hasLogo ? 38 : 14;
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
@@ -91,7 +107,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text('Billed To:', 18, 64);
   doc.setFont('helvetica', 'normal');
   doc.text(`Customer: ${invoice.customer_name || 'Walk-in Customer'}`, 18, 70);
-  doc.text(`Phone: ${invoice.customer_phone || 'N/A'}  |  Email: ${invoice.customer_email || 'N/A'}`, 18, 75);
+  doc.text(`Phone: ${invoice.customer_phone || 'N/A'}  |  GSTIN: ${invoice.customer_gstin || 'N/A'}`, 18, 75);
 
   // 4. Items Table
   const tableData = (invoice.items || []).map((item, idx) => {
@@ -101,9 +117,9 @@ export function generateInvoicePDF(invoice, options = {}) {
     return [
       idx + 1,
       item.product_name || 'N/A',
-      item.barcode || '–',
+      item.hsn_sac || item.barcode || '–',
       formatCurrencyPDF(item.unit_price),
-      item.quantity || 1,
+      `${item.quantity || 1}${item.unit ? ` ${item.unit}` : ''}`,
       discVal > 0 ? `${discVal}%` : '–',
       gstVal > 0 ? `${gstVal}%` : '–',
       formatCurrencyPDF(item.total_price)
@@ -113,7 +129,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.autoTable({
     startY: 85,
     margin: { left: 14, right: 14 },
-    head: [['#', 'Product Description', 'Barcode', 'Rate', 'Qty', 'Disc %', 'GST %', 'Amount']],
+    head: [['#', 'Description', 'HSN', 'Rate', 'Qty', 'Disc', 'GST', 'Amount']],
     body: tableData,
     headStyles: {
       fillColor: BRAND_COLOR,
@@ -223,7 +239,6 @@ export function generateQuotationPDF(quotation, options = {}) {
   const shopPhone = settings.shop_phone || '+91 98765 43210';
   const shopEmail = settings.shop_email || 'info@prabhuratna.com';
   const footerNote = settings.invoice_footer_note || 'Thank you for shopping with us! Visit again.';
-  const logoBase64 = settings.logo_base64 || '';
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -235,15 +250,8 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFillColor(...BRAND_COLOR);
   doc.rect(0, 0, 210, 28, 'F');
 
-  if (logoBase64) {
-    try {
-      doc.addImage(logoBase64, 'PNG', 14, 4, 20, 20);
-    } catch (e) {
-      console.error('Failed to render logo in PDF:', e);
-    }
-  }
-
-  const titleX = logoBase64 ? 38 : 14;
+  const hasLogo = drawShopLogo(doc, settings);
+  const titleX = hasLogo ? 38 : 14;
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);

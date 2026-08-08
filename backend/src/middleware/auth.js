@@ -14,7 +14,7 @@ function authenticateToken(req, res, next) {
 
   jwt.verify(token, JWT_SECRET, (err, payload) => {
     if (err) {
-      return res.status(403).json({ success: false, message: 'Invalid or expired token' });
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 
     const user = db.prepare(
@@ -22,11 +22,11 @@ function authenticateToken(req, res, next) {
     ).get(payload.id);
 
     if (!user) {
-      return res.status(403).json({ success: false, message: 'Invalid or expired token' });
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 
     if (user.status === 'inactive') {
-      return res.status(403).json({
+      return res.status(401).json({
         success: false,
         message: 'Your account is deactivated. Please contact System Administrator.'
       });

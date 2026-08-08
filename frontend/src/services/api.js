@@ -46,8 +46,11 @@ export async function apiRequest(endpoint, method = 'GET', data = null, customHe
     }
 
     if (!response.ok) {
-      if (response.status === 401) {
-        // Token expired or invalid
+      const authFailure =
+        response.status === 401 ||
+        (response.status === 403 && /token|deactivated|Authentication required/i.test(result?.message || ''));
+
+      if (authFailure) {
         localStorage.removeItem('prabhuratna_token');
         localStorage.removeItem('prabhuratna_user');
         window.dispatchEvent(new Event('auth:unauthorized'));

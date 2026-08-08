@@ -34,13 +34,15 @@ export function AuthProvider({ children }) {
 
     // Staff permissions mapping
     if (role === 'staff') {
+      if (module === 'dashboard') return ['view'].includes(action);
       if (module === 'products') return ['view', 'add', 'edit'].includes(action);
       if (module === 'billing' || module === 'invoices') return ['view', 'create', 'print', 'download'].includes(action);
       if (module === 'inventory') return ['view', 'update'].includes(action);
       if (module === 'suppliers') return ['view', 'create', 'edit'].includes(action);
       if (module === 'purchases') return ['view', 'create', 'edit'].includes(action);
       if (module === 'returns') return ['view', 'create'].includes(action);
-      // Restricted for Staff: reports, users, settings, deletion
+      if (module === 'customers') return ['view', 'create', 'edit'].includes(action);
+      if (module === 'cashbook') return ['view', 'create', 'edit'].includes(action);
       return false;
     }
     return false;

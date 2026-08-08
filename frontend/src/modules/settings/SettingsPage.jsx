@@ -12,6 +12,8 @@ export default function SettingsPage() {
     shop_phone: '',
     shop_email: '',
     shop_gstin: '',
+    owner_whatsapp: '',
+    logo_url: '',
     invoice_footer_note: '',
     logo_base64: ''
   });
@@ -35,6 +37,8 @@ export default function SettingsPage() {
           shop_phone: res.settings.shop_phone || '',
           shop_email: res.settings.shop_email || '',
           shop_gstin: res.settings.shop_gstin || '',
+          owner_whatsapp: res.settings.owner_whatsapp || '',
+          logo_url: res.settings.logo_url || '',
           invoice_footer_note: res.settings.invoice_footer_note || '',
           logo_base64: res.settings.logo_base64 || ''
         });
@@ -51,6 +55,26 @@ export default function SettingsPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const compressLogo = (dataUrl, maxSize = 400, quality = 0.85) =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/png', quality));
+      };
+      img.onerror = () => reject(new Error('Invalid image file'));
+      img.src = dataUrl;
+    });
+
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -61,8 +85,14 @@ export default function SettingsPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
-      setFormData((prev) => ({ ...prev, logo_base64: reader.result }));
+    reader.onload = async () => {
+      try {
+        const compressed = await compressLogo(reader.result);
+        setFormData((prev) => ({ ...prev, logo_base64: compressed }));
+        setToast({ isOpen: true, type: 'success', message: 'Logo ready — click Save Settings to apply everywhere' });
+      } catch {
+        setToast({ isOpen: true, type: 'danger', message: 'Failed to process logo image' });
+      }
     };
     reader.onerror = () => {
       setToast({ isOpen: true, type: 'danger', message: 'Failed to process logo image' });
@@ -71,7 +101,7 @@ export default function SettingsPage() {
   };
 
   const handleRemoveLogo = () => {
-    setFormData((prev) => ({ ...prev, logo_base64: '' }));
+    setFormData((prev) => ({ ...prev, logo_base64: '', logo_url: '' }));
   };
 
   const handleSubmit = async (e) => {
@@ -80,7 +110,18 @@ export default function SettingsPage() {
     try {
       const res = await apiRequest('/settings', 'PUT', formData);
       if (res.success) {
-        setToast({ isOpen: true, type: 'success', message: 'Business settings saved successfully!' });
+        if (res.settings) {
+          setFormData((prev) => ({
+            ...prev,
+            ...res.settings,
+            logo_base64: res.settings.logo_base64 || '',
+            logo_url: res.settings.logo_url || ''
+          }));
+        }
+        window.dispatchEvent(new CustomEvent('shop-settings:updated', {
+          detail: { settings: res.settings || formData }
+        }));
+        setToast({ isOpen: true, type: 'success', message: 'Business settings saved — logo updated on invoices, quotations, landing & app' });
       }
     } catch (err) {
       console.error(err);
@@ -106,7 +147,7 @@ export default function SettingsPage() {
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
             <Building2 className="w-5 h-5 text-[#C0392B] dark:text-[#E74C3C]" /> Business Branding & Settings
           </h2>
-          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">Configure store information, tax details, invoice footer notes, and logo image for PDFs</p>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">Logo & store details apply to invoices, quotations, landing page, and the app header</p>
         </div>
       </div>
 
@@ -155,7 +196,7 @@ export default function SettingsPage() {
                   />
                 </label>
                 <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">
-                  PNG or JPEG format (Max 2MB). Appears at top-left of PDF Invoices & Quotations.
+                  PNG or JPEG (Max 2MB). Used on PDFs, landing page, and app navigation after you save.
                 </p>
               </div>
             </div>
@@ -178,6 +219,18 @@ export default function SettingsPage() {
               value={formData.shop_gstin}
               onChange={(e) => handleInputChange('shop_gstin', e.target.value)}
               placeholder="e.g. 24ABCDE1234F1Z5"
+            />
+            <Input
+              label="Owner WhatsApp (low-stock alerts)"
+              value={formData.owner_whatsapp}
+              onChange={(e) => handleInputChange('owner_whatsapp', e.target.value)}
+              placeholder="9198XXXXXXXX"
+            />
+            <Input
+              label="Logo URL (preferred over base64)"
+              value={formData.logo_url}
+              onChange={(e) => handleInputChange('logo_url', e.target.value)}
+              placeholder="https://.../logo.png"
             />
 
             <Input

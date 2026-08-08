@@ -119,6 +119,17 @@ exports.createPurchase = (req, res) => {
               newStock,
               `Purchased in ${purchaseNumber} from ${supplier.name}`
             );
+            db.prepare(`
+              INSERT INTO product_cost_history (product_id, purchase_id, purchase_price, quantity, remaining_qty, notes)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `).run(
+              item.product_id,
+              purchaseId,
+              landedCostPerUnit,
+              qty,
+              qty,
+              `Batch from ${purchaseNumber}`
+            );
           }
         }
       }

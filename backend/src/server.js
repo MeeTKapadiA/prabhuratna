@@ -18,6 +18,11 @@ const returnRoutes = require('./routes/returnRoutes');
 const backupRoutes = require('./routes/backupRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const customerRoutes = require('./routes/customerRoutes');
+const creditNoteRoutes = require('./routes/creditNoteRoutes');
+const expenseRoutes = require('./routes/expenseRoutes');
+const cashbookRoutes = require('./routes/cashbookRoutes');
+const auditRoutes = require('./routes/auditRoutes');
 const { apiLimiter } = require('./middleware/rateLimit');
 
 const app = express();
@@ -53,8 +58,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ limit: '2mb', extended: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use('/api', apiLimiter);
 
 app.use('/api/auth', authRoutes);
@@ -72,6 +77,11 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/credit-notes', creditNoteRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/cashbook', cashbookRoutes);
+app.use('/api/audit', auditRoutes);
 
 app.get('/', (req, res) => {
   res.json({

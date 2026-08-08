@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useShopSettings } from '../../context/ShopSettingsContext';
 import { getDefaultRouteForUser } from '../../config/navConfig';
 import AuthModal from '../auth/AuthModal';
 import Button from '../../components/ui/Button';
+import ShopLogo from '../../components/ui/ShopLogo';
 import { apiRequest } from '../../services/api';
 import { formatCurrency } from '../../services/calcService';
 import {
@@ -31,9 +33,13 @@ import {
 } from 'lucide-react';
 
 export default function LandingPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, hasPermission } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { shopName, branding } = useShopSettings();
   const navigate = useNavigate();
+  const displayShopName = (shopName || 'PRABHURATNA').toUpperCase();
+  const displayPhone = branding.shop_phone || '098244 93420';
+  const displayAddress = branding.shop_address || 'Main Road, Opp. Union Bank of India, Ibrahim Market, Vapi East, Gujarat 396191';
   
   // State
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -269,13 +275,13 @@ export default function LandingPage() {
 
       {/* 2. Main Store Header */}
       <header className="border-b border-[#E5E7EB] dark:border-[#2D3138] bg-[#FFFFFF] dark:bg-[#1E2126] sticky top-0 z-40 px-4 sm:px-8 py-3 flex items-center justify-between flex-nowrap transition-colors shadow-sm">
-        {/* Brand Logo */}
-        <a href="#home" className="flex items-center gap-3 flex-shrink-0">
-          <div className="w-10 h-10 rounded-xl bg-[#C0392B] dark:bg-[#E74C3C] flex items-center justify-center font-extrabold text-white text-xl shadow-md">
-            P
-          </div>
-          <div>
-            <span className="text-lg font-extrabold tracking-tight text-[#1A1A1A] dark:text-[#F1F1F1] block leading-none">PRABHURATNA</span>
+        {/* Brand Logo — from Business Settings */}
+        <a href="#home" className="flex items-center gap-3 flex-shrink-0 min-w-0">
+          <ShopLogo className="w-10 h-10" />
+          <div className="min-w-0">
+            <span className="text-lg font-extrabold tracking-tight text-[#1A1A1A] dark:text-[#F1F1F1] block leading-none truncate max-w-[200px] sm:max-w-none">
+              {displayShopName}
+            </span>
             <span className="text-[10px] text-[#C0392B] dark:text-[#E74C3C] font-bold uppercase tracking-widest block mt-0.5">METALS & APPLIANCES</span>
           </div>
         </a>
@@ -320,16 +326,23 @@ export default function LandingPage() {
 
           {/* Staff Login / ERP Access CTA */}
           {isAuthenticated ? (
-            <Button onClick={() => navigate('/app/dashboard')} variant="primary" size="sm" icon={ChevronRight} iconPosition="right">
-              POS Dashboard
+            <Button
+              onClick={() => navigate('/app')}
+              variant="primary"
+              size="sm"
+              icon={ChevronRight}
+              iconPosition="right"
+            >
+              Open App
             </Button>
           ) : (
             <button
+              type="button"
               onClick={() => setAuthModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#4A5568] dark:bg-[#2D3138] hover:bg-[#1A1A1A] dark:hover:bg-[#1E2126] text-white font-bold text-xs border border-[#E5E7EB] dark:border-[#2D3138] transition-all"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Staff POS Login</span>
+              <span>Staff Login</span>
             </button>
           )}
 
@@ -352,6 +365,31 @@ export default function LandingPage() {
           <a href="#why-us" onClick={() => setMobileMenuOpen(false)} className="block py-1 text-[#1A1A1A] dark:text-[#F1F1F1]">Why Choose Us</a>
           <a href="#reviews" onClick={() => setMobileMenuOpen(false)} className="block py-1 text-[#1A1A1A] dark:text-[#F1F1F1]">Reviews</a>
           <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="block py-1 text-[#1A1A1A] dark:text-[#F1F1F1]">Location & Contact</a>
+          {!isAuthenticated && (
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setAuthModalOpen(true);
+              }}
+              className="w-full mt-2 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#4A5568] dark:bg-[#2D3138] text-white font-bold text-sm"
+            >
+              <Lock className="w-4 h-4" />
+              Staff Login
+            </button>
+          )}
+          {isAuthenticated && (
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                navigate('/app');
+              }}
+              className="w-full mt-2 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#C0392B] dark:bg-[#E74C3C] text-white font-bold text-sm"
+            >
+              Open App
+            </button>
+          )}
         </div>
       )}
 
@@ -842,8 +880,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-xs">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[#C0392B] dark:bg-[#E74C3C] flex items-center justify-center font-bold text-white">P</div>
-              <span className="font-extrabold text-[#1A1A1A] dark:text-[#F1F1F1] text-sm">PRABHURATNA</span>
+              <ShopLogo className="w-8 h-8" rounded="rounded-lg" />
+              <span className="font-extrabold text-[#1A1A1A] dark:text-[#F1F1F1] text-sm">{displayShopName}</span>
             </div>
             <p className="text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed">
               Vapi's premier store for heavy-duty stainless steel cookware, authentic brass & copperware, and leading home appliances.
@@ -876,8 +914,8 @@ export default function LandingPage() {
           <div>
             <h4 className="font-bold text-[#1A1A1A] dark:text-[#F1F1F1] uppercase tracking-wider mb-3">Store Contact</h4>
             <div className="space-y-2 text-[#6B7280] dark:text-[#9CA3AF]">
-              <p>📍 Main Road, Opp. Union Bank of India, Ibrahim Market, Vapi East, Gujarat 396191</p>
-              <p>📞 Call: <a href="tel:09824493420" className="text-[#1A1A1A] dark:text-[#F1F1F1] font-bold">098244 93420</a></p>
+              <p>📍 {displayAddress}</p>
+              <p>📞 Call: <a href={`tel:${String(displayPhone).replace(/\s/g, '')}`} className="text-[#1A1A1A] dark:text-[#F1F1F1] font-bold">{displayPhone}</a></p>
               <p>🕒 Open Daily 9:00 AM - 9:00 PM</p>
             </div>
           </div>
@@ -886,6 +924,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto pt-8 mt-8 border-t border-[#E5E7EB] dark:border-[#2D3138] flex flex-col sm:flex-row items-center justify-between text-[11px] text-[#6B7280] dark:text-[#9CA3AF] gap-4">
           <p>© 2026 Prabhuratna Metals and Appliances. All Rights Reserved.</p>
           <button
+            type="button"
             onClick={() => setAuthModalOpen(true)}
             className="text-[#4A5568] dark:text-[#94A3B8] hover:text-[#C0392B] dark:hover:text-[#E74C3C] underline font-semibold flex items-center gap-1"
           >
@@ -924,7 +963,7 @@ export default function LandingPage() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        onSuccess={(user) => navigate(getDefaultRouteForUser(user))}
+        onSuccess={(user) => navigate(getDefaultRouteForUser(user, hasPermission))}
       />
     </div>
   );

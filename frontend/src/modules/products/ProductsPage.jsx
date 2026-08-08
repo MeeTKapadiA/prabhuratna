@@ -48,7 +48,14 @@ export default function ProductsPage() {
     stock_quantity: '10',
     min_stock_level: '5',
     image_url: '',
-    show_on_website: false
+    show_on_website: false,
+    hsn_sac: '',
+    unit: 'pcs',
+    size_variant: '',
+    gauge: '',
+    damaged_stock: '0',
+    display_stock: '0',
+    scrap_stock: '0'
   });
 
   const [toast, setToast] = useState({ isOpen: false, type: 'info', message: '' });
@@ -657,6 +664,27 @@ export default function ProductsPage() {
               onChange={(e) => setFormData({ ...formData, gst_percent: e.target.value })}
               placeholder="18"
             />
+            <Input
+              label="HSN / SAC"
+              value={formData.hsn_sac || ''}
+              onChange={(e) => setFormData({ ...formData, hsn_sac: e.target.value })}
+              placeholder="e.g. 7323"
+            />
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF] mb-1">Unit</label>
+              <select
+                value={formData.unit || 'pcs'}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                className="w-full px-3 py-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-xs"
+              >
+                {['pcs', 'kg', 'set', 'box', 'meter', 'pair'].map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <Input label="Size / Variant" value={formData.size_variant || ''} onChange={(e) => setFormData({ ...formData, size_variant: e.target.value })} placeholder="5L / 24cm" />
+            <Input label="Gauge" value={formData.gauge || ''} onChange={(e) => setFormData({ ...formData, gauge: e.target.value })} placeholder="18 gauge" />
+            <Input label="Damaged Stock" type="number" value={formData.damaged_stock || '0'} onChange={(e) => setFormData({ ...formData, damaged_stock: e.target.value })} />
+            <Input label="Display Stock" type="number" value={formData.display_stock || '0'} onChange={(e) => setFormData({ ...formData, display_stock: e.target.value })} />
+            <Input label="Scrap Stock" type="number" value={formData.scrap_stock || '0'} onChange={(e) => setFormData({ ...formData, scrap_stock: e.target.value })} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

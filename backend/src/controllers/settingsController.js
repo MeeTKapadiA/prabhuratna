@@ -6,8 +6,12 @@ const ALLOWED_SETTING_KEYS = [
   'shop_phone',
   'shop_email',
   'shop_gstin',
+  'shop_state_code',
   'logo_base64',
-  'invoice_footer_note'
+  'logo_url',
+  'invoice_footer_note',
+  'owner_whatsapp',
+  'low_stock_alert_enabled'
 ];
 
 function readSettings() {
@@ -25,6 +29,29 @@ exports.getSettings = (req, res) => {
   } catch (error) {
     console.error('Error fetching settings:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch settings' });
+  }
+};
+
+/** Public branding fields for landing page / unauthenticated UI (no secrets). */
+exports.getPublicSettings = (req, res) => {
+  try {
+    const all = readSettings();
+    return res.json({
+      success: true,
+      settings: {
+        shop_name: all.shop_name || '',
+        shop_address: all.shop_address || '',
+        shop_phone: all.shop_phone || '',
+        shop_email: all.shop_email || '',
+        shop_gstin: all.shop_gstin || '',
+        logo_base64: all.logo_base64 || '',
+        logo_url: all.logo_url || '',
+        invoice_footer_note: all.invoice_footer_note || ''
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching public settings:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch public settings' });
   }
 };
 

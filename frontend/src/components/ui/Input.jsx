@@ -49,8 +49,8 @@ export default function Input({
             onChange={onChange}
             placeholder={placeholder}
             disabled={disabled}
-            rows={3}
-            className={`w-full p-3 bg-white dark:bg-[#1E2126] border ${error ? 'border-rose-500' : 'border-slate-300 dark:border-[#2D3138]'} rounded-xl text-sm text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C] transition-all duration-200 disabled:opacity-50`}
+            rows={props.rows || 3}
+            className={`w-full min-w-0 p-3 bg-white dark:bg-[#1E2126] border ${error ? 'border-rose-500' : 'border-slate-300 dark:border-[#2D3138]'} rounded-xl text-sm text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C] transition-all duration-200 disabled:opacity-50`}
             {...props}
           />
         ) : (
@@ -61,7 +61,7 @@ export default function Input({
             onChange={onChange}
             placeholder={placeholder}
             disabled={disabled}
-            className={`w-full ${Icon ? 'pl-10' : 'pl-3.5'} pr-4 py-2.5 bg-white dark:bg-[#1E2126] border ${error ? 'border-rose-500' : 'border-slate-300 dark:border-[#2D3138]'} rounded-xl text-sm text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C] transition-all duration-200 disabled:opacity-50`}
+            className={`w-full min-w-0 ${Icon ? 'pl-10' : 'pl-3.5'} pr-4 py-2.5 bg-white dark:bg-[#1E2126] border ${error ? 'border-rose-500' : 'border-slate-300 dark:border-[#2D3138]'} rounded-xl text-sm text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C] transition-all duration-200 disabled:opacity-50`}
             {...props}
           />
         )}

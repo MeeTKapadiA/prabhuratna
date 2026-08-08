@@ -11,21 +11,25 @@ import {
   TrendingUp,
   BarChart3,
   Users,
-  Building2
+  Building2,
+  Wallet,
+  BookOpen,
+  UserCircle,
+  ScrollText,
+  FileMinus
 } from 'lucide-react';
 
 export const NAV_SECTIONS = [
   {
     id: 'main',
-    title: null, // Top-level item without section header
+    title: null,
     items: [
       {
         id: 'dashboard',
         label: 'Dashboard',
         path: '/app/dashboard',
         icon: LayoutDashboard,
-        module: 'dashboard',
-        adminOnly: true
+        module: 'dashboard'
       }
     ]
   },
@@ -60,6 +64,20 @@ export const NAV_SECTIONS = [
         path: '/app/returns',
         icon: RotateCcw,
         module: 'returns'
+      },
+      {
+        id: 'credit-notes',
+        label: 'Credit Notes',
+        path: '/app/credit-notes',
+        icon: FileMinus,
+        module: 'billing'
+      },
+      {
+        id: 'customers',
+        label: 'Customers / Udhaar',
+        path: '/app/customers',
+        icon: UserCircle,
+        module: 'customers'
       }
     ]
   },
@@ -98,6 +116,27 @@ export const NAV_SECTIONS = [
     ]
   },
   {
+    id: 'money',
+    title: 'Money',
+    items: [
+      {
+        id: 'cashbook',
+        label: 'Cashbook',
+        path: '/app/cashbook',
+        icon: BookOpen,
+        module: 'cashbook'
+      },
+      {
+        id: 'expenses',
+        label: 'Expenses',
+        path: '/app/expenses',
+        icon: Wallet,
+        module: 'expenses',
+        adminOnly: true
+      }
+    ]
+  },
+  {
     id: 'admin',
     title: 'Admin & Analytics',
     items: [
@@ -115,6 +154,14 @@ export const NAV_SECTIONS = [
         path: '/app/profit-margin',
         icon: TrendingUp,
         module: 'reports',
+        adminOnly: true
+      },
+      {
+        id: 'activity',
+        label: 'Activity Log',
+        path: '/app/activity',
+        icon: ScrollText,
+        module: 'audit',
         adminOnly: true
       },
       {

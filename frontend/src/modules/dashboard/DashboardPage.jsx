@@ -88,14 +88,21 @@ export default function DashboardPage() {
   const profit = stats.profit || { grossMarginPercent: 0, grossProfit: 0, totalRevenue: 0, totalCost: 0 };
   const insights = stats.insights || { topProfitable: [], lowestProfitable: [] };
   const chartData = stats.chartData || [];
+  const isStaffView = stats.role === 'staff';
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Executive Operations Banner */}
       <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-[#F1F1F1] tracking-tight">Executive Operations Dashboard</h2>
-          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1">Real-time financial performance, inventory alerts, and sales analytics</p>
+          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-[#F1F1F1] tracking-tight">
+            {isStaffView ? 'Staff Dashboard' : 'Executive Operations Dashboard'}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-1">
+            {isStaffView
+              ? 'Today\'s billing, low stock alerts, and quick sales overview'
+              : 'Real-time financial performance, inventory alerts, and sales analytics'}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">

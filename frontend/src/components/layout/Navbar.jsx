@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useShopSettings } from '../../context/ShopSettingsContext';
+import ShopLogo from '../ui/ShopLogo';
 import { ShoppingCart, LogOut, Clock, Menu, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSidebarCollapse }) {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { shopName } = useShopSettings();
   const navigate = useNavigate();
   const [time, setTime] = useState(new Date().toLocaleTimeString());
 
@@ -35,17 +38,12 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
           {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
         </button>
 
-        <Link to="/app/dashboard" className="flex items-center gap-2.5">
-          <img
-            src="/logo.png"
-            alt="Prabhuratna Metals Logo"
-            className="w-9 h-9 object-contain rounded-xl bg-white p-0.5 border border-slate-200 dark:border-[#2D3138] flex-shrink-0 shadow-sm"
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
-          />
-          <div className="hidden sm:block">
-            <h1 className="text-base font-bold text-slate-900 dark:text-[#F1F1F1] leading-none">PRABHURATNA</h1>
+        <Link to="/app/dashboard" className="flex items-center gap-2.5 min-w-0">
+          <ShopLogo className="w-9 h-9" />
+          <div className="hidden sm:block min-w-0">
+            <h1 className="text-base font-bold text-slate-900 dark:text-[#F1F1F1] leading-none truncate max-w-[180px]">
+              {(shopName || 'PRABHURATNA').toUpperCase()}
+            </h1>
             <p className="text-[10px] text-[#C0392B] dark:text-[#E74C3C] font-bold tracking-wider uppercase">ERP & Billing POS</p>
           </div>
         </Link>

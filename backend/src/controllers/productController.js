@@ -109,12 +109,22 @@ exports.createProduct = (req, res) => {
       stock_quantity,
       min_stock_level,
       image_url,
-      show_on_website
+      show_on_website,
+      hsn_sac,
+      unit,
+      size_variant,
+      gauge,
+      damaged_stock,
+      display_stock,
+      scrap_stock
     } = req.body;
 
     if (!name || !sku || selling_price === undefined) {
       return res.status(400).json({ success: false, message: 'Product name, SKU, and selling price are required' });
     }
+
+    const allowedUnits = ['pcs', 'kg', 'set', 'box', 'meter', 'pair'];
+    const finalUnit = allowedUnits.includes(String(unit || '').toLowerCase()) ? String(unit).toLowerCase() : 'pcs';
 
     // Auto generate barcode if missing
     const finalBarcode = barcode || `890${Date.now().toString().slice(-9)}`;
@@ -135,8 +145,9 @@ exports.createProduct = (req, res) => {
     const stmt = db.prepare(`
       INSERT INTO products (
         name, barcode, sku, category, brand, purchase_price, selling_price,
-        discount_percent, gst_percent, stock_quantity, min_stock_level, image_url, show_on_website
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        discount_percent, gst_percent, stock_quantity, min_stock_level, image_url, show_on_website,
+        hsn_sac, unit, size_variant, gauge, damaged_stock, display_stock, scrap_stock
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -148,11 +159,18 @@ exports.createProduct = (req, res) => {
       parseFloat(purchase_price) || 0,
       parseFloat(selling_price) || 0,
       parseFloat(discount_percent) || 0,
-      parseFloat(gst_percent) || 0,
+      parseFloat(gst_percent) || 18,
       parseInt(stock_quantity) || 0,
       parseInt(min_stock_level) || 5,
       image_url || null,
-      show_on_website !== undefined ? (show_on_website ? 1 : 0) : 1
+      show_on_website !== undefined ? (show_on_website ? 1 : 0) : 1,
+      hsn_sac || '',
+      finalUnit,
+      size_variant || '',
+      gauge || '',
+      parseFloat(damaged_stock) || 0,
+      parseFloat(display_stock) || 0,
+      parseFloat(scrap_stock) || 0
     );
 
     // Log initial stock inventory if > 0
@@ -193,8 +211,20 @@ exports.updateProduct = (req, res) => {
       min_stock_level,
       image_url,
       is_active,
-      show_on_website
+      show_on_website,
+      hsn_sac,
+      unit,
+      size_variant,
+      gauge,
+      damaged_stock,
+      display_stock,
+      scrap_stock
     } = req.body;
+
+    const allowedUnits = ['pcs', 'kg', 'set', 'box', 'meter', 'pair'];
+    const finalUnit = unit !== undefined
+      ? (allowedUnits.includes(String(unit).toLowerCase()) ? String(unit).toLowerCase() : existing.unit || 'pcs')
+      : (existing.unit || 'pcs');
 
     const stmt = db.prepare(`
       UPDATE products SET
@@ -212,6 +242,13 @@ exports.updateProduct = (req, res) => {
         image_url = ?,
         is_active = ?,
         show_on_website = ?,
+        hsn_sac = ?,
+        unit = ?,
+        size_variant = ?,
+        gauge = ?,
+        damaged_stock = ?,
+        display_stock = ?,
+        scrap_stock = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
@@ -231,6 +268,13 @@ exports.updateProduct = (req, res) => {
       image_url !== undefined ? image_url : existing.image_url,
       is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active,
       show_on_website !== undefined ? (show_on_website ? 1 : 0) : existing.show_on_website,
+      hsn_sac !== undefined ? hsn_sac : (existing.hsn_sac || ''),
+      finalUnit,
+      size_variant !== undefined ? size_variant : (existing.size_variant || ''),
+      gauge !== undefined ? gauge : (existing.gauge || ''),
+      damaged_stock !== undefined ? parseFloat(damaged_stock) : (existing.damaged_stock || 0),
+      display_stock !== undefined ? parseFloat(display_stock) : (existing.display_stock || 0),
+      scrap_stock !== undefined ? parseFloat(scrap_stock) : (existing.scrap_stock || 0),
       id
     );
 
@@ -249,6 +293,45 @@ exports.updateProduct = (req, res) => {
   } catch (error) {
     console.error('Error updating product:', error);
     return res.status(500).json({ success: false, message: 'Failed to update product' });
+  }
+};
+
+exports.getCostHistory = (req, res) => {
+  try {
+    const history = db.prepare(`
+      SELECT * FROM product_cost_history
+      WHERE product_id = ?
+      ORDER BY id DESC
+      LIMIT 50
+    `).all(req.params.id);
+    return res.json({ success: true, history });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch cost history' });
+  }
+};
+
+exports.getLowStockAlertLink = (req, res) => {
+  try {
+    const settings = {};
+    db.prepare('SELECT key, value FROM settings').all().forEach((row) => { settings[row.key] = row.value; });
+    const low = db.prepare(`
+      SELECT name, sku, stock_quantity, min_stock_level, unit
+      FROM products
+      WHERE is_active = 1 AND stock_quantity <= min_stock_level
+      ORDER BY stock_quantity ASC
+      LIMIT 20
+    `).all();
+
+    const lines = [
+      `*${settings.shop_name || 'Prabhuratna'}* — Low Stock Alert`,
+      ...low.map((p) => `• ${p.name} (${p.sku}): ${p.stock_quantity} ${p.unit || 'pcs'} / min ${p.min_stock_level}`)
+    ];
+    const phone = (settings.owner_whatsapp || '').replace(/\D/g, '');
+    const text = encodeURIComponent(lines.join('\n'));
+    const whatsappUrl = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    return res.json({ success: true, count: low.length, products: low, whatsappUrl });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to build low stock alert' });
   }
 };
 

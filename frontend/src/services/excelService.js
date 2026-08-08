@@ -1,14 +1,41 @@
-import * as XLSX from 'xlsx';
-
-export function exportToExcel(data, fileName = 'report') {
+export async function exportToExcel(data, fileName = 'report') {
   if (!data || !Array.isArray(data) || data.length === 0) {
     alert('No data available to export');
     return;
   }
 
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'DataReport');
-  
-  XLSX.writeFile(workbook, `${fileName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('DataReport');
+
+  const keys = Object.keys(data[0]);
+  worksheet.columns = keys.map((key) => ({
+    header: key,
+    key,
+    width: Math.max(12, String(key).length + 4)
+  }));
+
+  data.forEach((row) => {
+    const normalized = {};
+    keys.forEach((key) => {
+      const value = row[key];
+      normalized[key] = value !== null && typeof value === 'object' ? JSON.stringify(value) : value;
+    });
+    worksheet.addRow(normalized);
+  });
+
+  worksheet.getRow(1).font = { bold: true };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${fileName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 }

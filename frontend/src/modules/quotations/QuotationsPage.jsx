@@ -9,11 +9,13 @@ import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
 import { calculateCartTotals, formatCurrency, formatDate } from '../../services/calcService';
 import { generateQuotationPDF, printQuotationPDF } from '../../services/pdfService';
+import { useShopSettings } from '../../context/ShopSettingsContext';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { FileText, Plus, Download, Printer, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function QuotationsPage() {
+  const { settings: shopSettings } = useShopSettings();
   const [quotations, setQuotations] = useState([]);
   const [settings, setSettings] = useState({});
   const [search, setSearch] = useState('');
@@ -54,6 +56,12 @@ export default function QuotationsPage() {
   useEffect(() => {
     fetchQuotations();
   }, [search]);
+
+  useEffect(() => {
+    if (shopSettings && Object.keys(shopSettings).length) {
+      setSettings(shopSettings);
+    }
+  }, [shopSettings]);
 
   // Search Products for Adding to Quotation
   useEffect(() => {

@@ -3,20 +3,32 @@ const db = require('../config/db');
 exports.getDashboardStats = (req, res) => {
   try {
     // 1. Sales Statistics
+    const activeInvoiceFilter = `(status IS NULL OR status = 'active')`;
+
     const todaySales = db.prepare(`
       SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count
-      FROM invoices WHERE DATE(created_at) = DATE('now')
+      FROM invoices WHERE DATE(created_at) = DATE('now') AND ${activeInvoiceFilter}
     `).get();
 
     const weeklySales = db.prepare(`
       SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count
-      FROM invoices WHERE DATE(created_at) >= DATE('now', '-7 days')
+      FROM invoices WHERE DATE(created_at) >= DATE('now', '-7 days') AND ${activeInvoiceFilter}
     `).get();
 
     const monthlySales = db.prepare(`
       SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count
-      FROM invoices WHERE DATE(created_at) >= DATE('now', '-30 days')
+      FROM invoices WHERE DATE(created_at) >= DATE('now', '-30 days') AND ${activeInvoiceFilter}
     `).get();
+
+    const staffToday = req.user?.role === 'staff'
+      ? db.prepare(`
+          SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count,
+            COALESCE(SUM(balance_due), 0) as pending_due
+          FROM invoices
+          WHERE DATE(created_at) = DATE('now') AND ${activeInvoiceFilter}
+            AND (created_by = ? OR created_by IS NULL)
+        `).get(req.user.id)
+      : todaySales;
 
     // 2. Inventory Metrics
     const totalProducts = db.prepare('SELECT COUNT(*) as count FROM products WHERE is_active = 1').get().count;
@@ -89,17 +101,24 @@ exports.getDashboardStats = (req, res) => {
         SUM(grand_total) as sales,
         COUNT(*) as invoices
       FROM invoices
-      WHERE DATE(created_at) >= DATE('now', '-7 days')
+      WHERE DATE(created_at) >= DATE('now', '-7 days') AND ${activeInvoiceFilter}
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at) ASC
     `).all();
 
+    const receivables = db.prepare(`
+      SELECT COALESCE(SUM(balance_due), 0) as total
+      FROM invoices WHERE balance_due > 0 AND ${activeInvoiceFilter}
+    `).get();
+
     return res.json({
       success: true,
+      role: req.user?.role || 'staff',
       sales: {
         today: todaySales,
         weekly: weeklySales,
-        monthly: monthlySales
+        monthly: monthlySales,
+        staffToday
       },
       inventory: {
         totalProducts,
@@ -113,6 +132,9 @@ exports.getDashboardStats = (req, res) => {
         totalCost,
         grossProfit,
         grossMarginPercent: parseFloat(grossMarginPercent)
+      },
+      money: {
+        receivables: receivables.total || 0
       },
       insights: {
         topProfitable: topProfitableProducts,

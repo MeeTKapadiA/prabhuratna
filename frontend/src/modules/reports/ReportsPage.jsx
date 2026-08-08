@@ -53,13 +53,17 @@ export default function ReportsPage() {
     fetchReport();
   }, [reportType, startDate, endDate]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (reportData.length === 0) {
       setToast({ isOpen: true, type: 'warning', message: 'No data to export' });
       return;
     }
-    exportToExcel(reportData, `${reportType}_report`);
-    setToast({ isOpen: true, type: 'success', message: 'Excel report downloaded!' });
+    try {
+      await exportToExcel(reportData, `${reportType}_report`);
+      setToast({ isOpen: true, type: 'success', message: 'Excel report downloaded!' });
+    } catch (err) {
+      setToast({ isOpen: true, type: 'danger', message: err.message || 'Excel export failed' });
+    }
   };
 
   const handleDownloadBackup = async () => {

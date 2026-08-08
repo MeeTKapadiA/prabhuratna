@@ -114,7 +114,7 @@ exports.getProfitReport = (req, res) => {
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       LEFT JOIN products p ON ii.product_id = p.id
-      WHERE 1=1
+      WHERE (i.status IS NULL OR i.status = 'active')
     `;
     const params = [];
 
@@ -128,13 +128,10 @@ exports.getProfitReport = (req, res) => {
     }
 
     query += ` GROUP BY ii.product_name ORDER BY gross_profit DESC`;
-
     const profitData = db.prepare(query).all(...params);
 
-    // Fetch total transport/freight expense for purchases in selected date range
     let transportQuery = `SELECT SUM(COALESCE(transport_amount, 0)) as total_transport FROM purchases WHERE 1=1`;
     const transportParams = [];
-
     if (startDate) {
       transportQuery += ` AND DATE(created_at) >= DATE(?)`;
       transportParams.push(startDate);
@@ -143,9 +140,19 @@ exports.getProfitReport = (req, res) => {
       transportQuery += ` AND DATE(created_at) <= DATE(?)`;
       transportParams.push(endDate);
     }
+    const totalTransport = db.prepare(transportQuery).get(...transportParams)?.total_transport || 0;
 
-    const transportResult = db.prepare(transportQuery).get(...transportParams);
-    const totalTransport = (transportResult && transportResult.total_transport) || 0;
+    let expenseQuery = `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE 1=1`;
+    const expenseParams = [];
+    if (startDate) {
+      expenseQuery += ` AND DATE(expense_date) >= DATE(?)`;
+      expenseParams.push(startDate);
+    }
+    if (endDate) {
+      expenseQuery += ` AND DATE(expense_date) <= DATE(?)`;
+      expenseParams.push(endDate);
+    }
+    const totalExpenses = db.prepare(expenseQuery).get(...expenseParams)?.total || 0;
 
     const summary = profitData.reduce((acc, curr) => {
       acc.totalRevenue += curr.total_revenue || 0;
@@ -155,7 +162,8 @@ exports.getProfitReport = (req, res) => {
     }, { totalRevenue: 0, totalCost: 0, totalGrossProfit: 0 });
 
     summary.totalTransport = Math.round(totalTransport * 100) / 100;
-    summary.totalProfit = Math.round((summary.totalGrossProfit - totalTransport) * 100) / 100;
+    summary.totalExpenses = Math.round(totalExpenses * 100) / 100;
+    summary.totalProfit = Math.round((summary.totalGrossProfit - totalTransport - totalExpenses) * 100) / 100;
     summary.netProfit = summary.totalProfit;
     summary.overallMargin = summary.totalRevenue > 0 ? ((summary.totalProfit / summary.totalRevenue) * 100).toFixed(2) : 0;
 

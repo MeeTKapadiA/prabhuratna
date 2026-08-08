@@ -10,11 +10,16 @@ import StatCard from '../../components/ui/StatCard';
 import { apiRequest } from '../../services/api';
 import { formatCurrency, formatDate } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
+import { useShopSettings } from '../../context/ShopSettingsContext';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
-import { Receipt, Eye, Printer, Download, Phone, Mail, FileSpreadsheet, Calendar, DollarSign, CreditCard } from 'lucide-react';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useAuth } from '../../context/AuthContext';
+import { Receipt, Eye, Printer, Download, Phone, Mail, FileSpreadsheet, Calendar, DollarSign, CreditCard, Ban } from 'lucide-react';
 
 export default function InvoicesPage() {
+  const { isAdmin } = useAuth();
+  const { settings: shopSettings } = useShopSettings();
   const [invoices, setInvoices] = useState([]);
   const [settings, setSettings] = useState({});
   const [search, setSearch] = useState('');
@@ -26,6 +31,9 @@ export default function InvoicesPage() {
   // Detail Modal State
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
 
   const [toast, setToast] = useState({ isOpen: false, type: 'info', message: '' });
 
@@ -54,12 +62,10 @@ export default function InvoicesPage() {
   }, [search, paymentModeFilter, startDate, endDate]);
 
   useEffect(() => {
-    apiRequest('/settings').then((res) => {
-      if (res && res.success && res.settings) {
-        setSettings(res.settings);
-      }
-    }).catch(() => {});
-  }, []);
+    if (shopSettings && Object.keys(shopSettings).length) {
+      setSettings(shopSettings);
+    }
+  }, [shopSettings]);
 
   const handleOpenDetailModal = async (invoiceId) => {
     try {
@@ -134,7 +140,12 @@ export default function InvoicesPage() {
                   }
                 } catch (e) {}
               }
-            }
+            },
+            ...(isAdmin && row.status !== 'cancelled' ? [{
+              label: 'Cancel Invoice',
+              icon: Ban,
+              onClick: () => setCancelTarget(row)
+            }] : [])
           ]}
         />
       )
@@ -338,6 +349,42 @@ export default function InvoicesPage() {
               </div>
             </div>
 
+            {(selectedInvoice.cgst_amount > 0 || selectedInvoice.igst_amount > 0) && (
+              <div className="text-xs space-y-1 p-3 rounded-xl bg-slate-50 dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138]">
+                <div className="flex justify-between"><span>CGST</span><span>{formatCurrency(selectedInvoice.cgst_amount || 0)}</span></div>
+                <div className="flex justify-between"><span>SGST</span><span>{formatCurrency(selectedInvoice.sgst_amount || 0)}</span></div>
+                <div className="flex justify-between"><span>IGST</span><span>{formatCurrency(selectedInvoice.igst_amount || 0)}</span></div>
+                <div className="flex justify-between font-bold"><span>Balance Due</span><span>{formatCurrency(selectedInvoice.balance_due || 0)}</span></div>
+              </div>
+            )}
+
+            {selectedInvoice.balance_due > 0 && selectedInvoice.status !== 'cancelled' && (
+              <div className="flex flex-wrap items-end gap-2">
+                <Input label="Collect Payment" type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder={String(selectedInvoice.balance_due)} />
+                <Button
+                  variant="primary"
+                  onClick={async () => {
+                    try {
+                      const res = await apiRequest(`/billing/invoices/${selectedInvoice.id}/payments`, 'POST', {
+                        amount: payAmount || selectedInvoice.balance_due,
+                        payment_mode: 'CASH'
+                      });
+                      if (res.success) {
+                        setSelectedInvoice(res.invoice);
+                        setPayAmount('');
+                        fetchInvoices();
+                        setToast({ isOpen: true, type: 'success', message: 'Payment recorded' });
+                      }
+                    } catch (err) {
+                      setToast({ isOpen: true, type: 'danger', message: err.message || 'Payment failed' });
+                    }
+                  }}
+                >
+                  Save Payment
+                </Button>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="flex flex-wrap justify-between gap-2 pt-2">
               <div className="flex flex-wrap gap-2">
@@ -359,6 +406,30 @@ export default function InvoicesPage() {
           </div>
         </Modal>
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(cancelTarget)}
+        onClose={() => setCancelTarget(null)}
+        title="Cancel Invoice"
+        message={`Cancel ${cancelTarget?.invoice_number}? Stock will be restored. For GST reverse entry, issue a Credit Note after cancel.`}
+        confirmLabel="Cancel Invoice"
+        variant="danger"
+        isLoading={isCancelling}
+        onConfirm={async () => {
+          if (!cancelTarget) return;
+          setIsCancelling(true);
+          try {
+            await apiRequest(`/billing/invoices/${cancelTarget.id}/cancel`, 'POST', { reason: 'Cancelled from invoices screen' });
+            setToast({ isOpen: true, type: 'success', message: 'Invoice cancelled' });
+            setCancelTarget(null);
+            fetchInvoices();
+          } catch (err) {
+            setToast({ isOpen: true, type: 'danger', message: err.message || 'Cancel failed' });
+          } finally {
+            setIsCancelling(false);
+          }
+        }}
+      />
 
       <Toast
         isOpen={toast.isOpen}

@@ -308,15 +308,206 @@ function initDb() {
   runMigration(`ALTER TABLE invoices ADD COLUMN scrap_value REAL DEFAULT 0.0`);
   runMigration(`ALTER TABLE purchases ADD COLUMN transport_amount REAL DEFAULT 0.0`);
 
-  // Seed default business settings if empty
+  // Product enhancements (units, HSN, variants, stock buckets)
+  runMigration(`ALTER TABLE products ADD COLUMN hsn_sac TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE products ADD COLUMN unit TEXT DEFAULT 'pcs'`);
+  runMigration(`ALTER TABLE products ADD COLUMN size_variant TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE products ADD COLUMN gauge TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE products ADD COLUMN damaged_stock REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE products ADD COLUMN display_stock REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE products ADD COLUMN scrap_stock REAL DEFAULT 0`);
+
+  // Invoice GST / AR fields
+  runMigration(`ALTER TABLE invoices ADD COLUMN customer_id INTEGER`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN customer_gstin TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN customer_address TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN place_of_supply TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN tax_type TEXT DEFAULT 'CGST_SGST'`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN cgst_amount REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN sgst_amount REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN igst_amount REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN transport_amount REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN round_off REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN amount_paid REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN balance_due REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN payment_status TEXT DEFAULT 'paid'`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN status TEXT DEFAULT 'active'`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN created_by INTEGER`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN cancelled_at DATETIME`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN cancel_reason TEXT`);
+
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN hsn_sac TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN unit TEXT DEFAULT 'pcs'`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN taxable_value REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN cgst_amount REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN sgst_amount REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN igst_amount REAL DEFAULT 0`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN is_custom INTEGER DEFAULT 0`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN size_variant TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE invoice_items ADD COLUMN gauge TEXT DEFAULT ''`);
+
+  runMigration(`ALTER TABLE returns ADD COLUMN credit_note_id INTEGER`);
+  runMigration(`ALTER TABLE inventory_logs ADD COLUMN user_id INTEGER`);
+  runMigration(`ALTER TABLE inventory_logs ADD COLUMN stock_bucket TEXT DEFAULT 'saleable'`);
+
+  // Customers (udhaar / B2B)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      phone TEXT,
+      email TEXT,
+      address TEXT,
+      gstin TEXT DEFAULT '',
+      opening_balance REAL DEFAULT 0,
+      current_balance REAL DEFAULT 0,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Invoice payments (partial cash/UPI/card)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS invoice_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      payment_mode TEXT NOT NULL,
+      notes TEXT,
+      received_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+    );
+  `);
+
+  // Credit notes (GST returns / cancel)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS credit_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      credit_note_number TEXT UNIQUE NOT NULL,
+      invoice_id INTEGER,
+      customer_id INTEGER,
+      customer_name TEXT,
+      customer_gstin TEXT DEFAULT '',
+      reason TEXT,
+      subtotal REAL NOT NULL DEFAULT 0,
+      cgst_amount REAL DEFAULT 0,
+      sgst_amount REAL DEFAULT 0,
+      igst_amount REAL DEFAULT 0,
+      tax_amount REAL DEFAULT 0,
+      grand_total REAL NOT NULL DEFAULT 0,
+      status TEXT DEFAULT 'issued',
+      created_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS credit_note_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      credit_note_id INTEGER NOT NULL,
+      product_id INTEGER,
+      product_name TEXT NOT NULL,
+      hsn_sac TEXT DEFAULT '',
+      quantity REAL NOT NULL,
+      unit_price REAL NOT NULL,
+      gst_percent REAL DEFAULT 0,
+      taxable_value REAL DEFAULT 0,
+      cgst_amount REAL DEFAULT 0,
+      sgst_amount REAL DEFAULT 0,
+      igst_amount REAL DEFAULT 0,
+      total_price REAL NOT NULL,
+      restock_bucket TEXT DEFAULT 'saleable',
+      FOREIGN KEY (credit_note_id) REFERENCES credit_notes(id) ON DELETE CASCADE
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS credit_note_counters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      financial_year TEXT UNIQUE NOT NULL,
+      last_number INTEGER DEFAULT 0
+    );
+  `);
+
+  // Purchase rate / batch history
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS product_cost_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      purchase_id INTEGER,
+      purchase_price REAL NOT NULL,
+      quantity REAL NOT NULL DEFAULT 0,
+      remaining_qty REAL NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Expenses
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      description TEXT,
+      amount REAL NOT NULL,
+      payment_mode TEXT DEFAULT 'CASH',
+      expense_date DATE NOT NULL DEFAULT (DATE('now')),
+      created_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Daily cashbook
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cashbook_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entry_date DATE NOT NULL UNIQUE,
+      opening_cash REAL DEFAULT 0,
+      closing_cash REAL DEFAULT 0,
+      cash_sales REAL DEFAULT 0,
+      upi_sales REAL DEFAULT 0,
+      card_sales REAL DEFAULT 0,
+      credit_sales REAL DEFAULT 0,
+      cash_expenses REAL DEFAULT 0,
+      notes TEXT,
+      closed_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Audit logs
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      username TEXT,
+      action TEXT NOT NULL,
+      entity_type TEXT,
+      entity_id TEXT,
+      details TEXT,
+      ip_address TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Low-stock alert settings
   const defaultSettings = [
     ['shop_name', 'Prabhuratna Metals Pvt. Ltd.'],
     ['shop_address', 'Main Market Road, Commercial Complex, Ahmedabad, GJ'],
     ['shop_phone', '+91 98765 43210'],
     ['shop_email', 'info@prabhuratna.com'],
     ['shop_gstin', '24ABCDE1234F1Z5'],
+    ['shop_state_code', '24'],
     ['logo_base64', ''],
-    ['invoice_footer_note', 'Thank you for shopping with us! Visit again.']
+    ['logo_url', ''],
+    ['invoice_footer_note', 'Thank you for shopping with us! Visit again.'],
+    ['owner_whatsapp', '919824493420'],
+    ['low_stock_alert_enabled', '1']
   ];
 
   const insertSetting = db.prepare(`

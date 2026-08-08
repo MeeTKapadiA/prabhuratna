@@ -3,6 +3,7 @@ const router = express.Router();
 const settingsController = require('../controllers/settingsController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
+router.get('/public', settingsController.getPublicSettings);
 router.get('/', authenticateToken, settingsController.getSettings);
 router.put('/', authenticateToken, requireRole(['admin']), settingsController.updateSettings);
 

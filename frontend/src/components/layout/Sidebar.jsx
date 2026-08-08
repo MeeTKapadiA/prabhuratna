@@ -37,12 +37,14 @@ export default function Sidebar({ isOpen, onClose, isCollapsed }) {
 
       <aside
         className={`
-          fixed lg:static top-16 left-0 bottom-0 z-40 glass-panel border-r border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] flex flex-col justify-between transition-all duration-300 ease-in-out shadow-xs
+          fixed lg:relative lg:top-auto top-16 left-0 bottom-0 z-40 glass-panel border-r border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] flex flex-col justify-between shadow-xs
+          shrink-0 h-[calc(100dvh-4rem)] lg:h-full overflow-hidden overscroll-contain
+          transition-[width,transform] duration-300 ease-in-out
           ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
           ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        <div className="p-3 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="p-3 space-y-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0 custom-scrollbar overscroll-contain touch-pan-y">
           <div className="flex items-center justify-end px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#9CA3AF]">
             <button onClick={onClose} className="lg:hidden p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white">
               <X className="w-4 h-4" />
