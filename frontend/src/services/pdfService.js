@@ -60,9 +60,9 @@ function drawShopHeaderBlock(doc, {
   startY = 36
 }) {
   const leftX = 14;
-  const leftMaxWidth = 128; // leave gap before meta column at x=150
-  const metaLabelX = 150;
-  const metaValueX = 196;
+  const leftMaxWidth = 118; // leave room for meta labels + values
+  const metaLabelRightX = 158; // labels right-aligned here
+  const metaValueX = 196; // values right-aligned at page edge
   const lineH = 4.5;
 
   doc.setFont('helvetica', 'bold');
@@ -97,14 +97,21 @@ function drawShopHeaderBlock(doc, {
   });
   const leftBottom = y;
 
-  // Right meta — fixed top alignment, never overlaps wrapped address
+  // Right meta: label column | value column (no overlap)
   let metaY = startY;
   metaRows.forEach((row, idx) => {
     if (idx === 0) doc.setFont('helvetica', 'bold');
     else doc.setFont('helvetica', 'normal');
-    doc.text(row.label, metaLabelX, metaY);
-    doc.text(String(row.value || ''), metaValueX, metaY, { align: 'right' });
-    metaY += lineH + 0.5;
+    doc.setFontSize(9);
+    doc.text(String(row.label || ''), metaLabelRightX, metaY, { align: 'right' });
+    const value = String(row.value || '');
+    // Keep long values inside the value column
+    const maxValueWidth = metaValueX - metaLabelRightX - 4;
+    const valueLines = doc.splitTextToSize(value, maxValueWidth);
+    valueLines.forEach((line, lineIdx) => {
+      doc.text(line, metaValueX, metaY + lineIdx * lineH, { align: 'right' });
+    });
+    metaY += Math.max(1, valueLines.length) * (lineH + 0.5);
   });
 
   return Math.max(leftBottom, metaY) + 6;
