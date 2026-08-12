@@ -8,7 +8,7 @@ import Toast from '../../components/ui/Toast';
 import SearchBar from '../../components/ui/SearchBar';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
+import { formatCurrency, formatDateTime } from '../../services/calcService';
 import { Boxes, ArrowUpDown, AlertTriangle, TrendingUp, TrendingDown, Plus, Minus, History, QrCode, RefreshCw, Printer } from 'lucide-react';
 
 export default function InventoryPage() {
@@ -189,7 +189,7 @@ export default function InventoryPage() {
   const logColumns = [
     {
       header: 'Date & Time',
-      render: (row) => new Date(row.created_at).toLocaleString('en-IN')
+      render: (row) => formatDateTime(row.created_at)
     },
     { header: 'Product', accessor: 'product_name' },
     {
@@ -424,7 +424,7 @@ export default function InventoryPage() {
                   <div className="flex justify-between items-start gap-2">
                     <div>
                       <h4 className="font-extrabold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.product_name}</h4>
-                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">{new Date(item.created_at).toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">{formatDateTime(item.created_at)}</p>
                     </div>
                     <Badge variant={item.quantity_change > 0 ? 'success' : 'danger'}>
                       {item.change_type}

@@ -46,7 +46,7 @@ function initDb() {
       role TEXT DEFAULT 'admin',
       status TEXT DEFAULT 'active',
       last_login DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -73,8 +73,8 @@ function initDb() {
       image_url TEXT,
       is_active INTEGER DEFAULT 1,
       show_on_website INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+      updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -95,7 +95,7 @@ function initDb() {
       grand_total REAL NOT NULL,
       payment_mode TEXT NOT NULL,
       notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -132,7 +132,7 @@ function initDb() {
       notes TEXT,
       status TEXT DEFAULT 'PENDING',
       valid_until DATE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -163,7 +163,7 @@ function initDb() {
       previous_stock INTEGER NOT NULL,
       new_stock INTEGER NOT NULL,
       notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
   `);
@@ -179,7 +179,7 @@ function initDb() {
       gst_number TEXT,
       opening_balance REAL DEFAULT 0.0,
       current_balance REAL DEFAULT 0.0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -196,7 +196,7 @@ function initDb() {
       payment_status TEXT DEFAULT 'unpaid',
       amount_paid REAL DEFAULT 0.0,
       notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
     );
   `);
@@ -228,7 +228,7 @@ function initDb() {
       refund_mode TEXT NOT NULL DEFAULT 'cash',
       refund_amount REAL NOT NULL DEFAULT 0.0,
       status TEXT DEFAULT 'completed',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (invoice_id) REFERENCES invoices(id)
     );
   `);
@@ -255,7 +255,7 @@ function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       key TEXT UNIQUE NOT NULL,
       value TEXT,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -282,7 +282,7 @@ function initDb() {
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT UNIQUE NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -378,8 +378,8 @@ function initDb() {
       opening_balance REAL DEFAULT 0,
       current_balance REAL DEFAULT 0,
       notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+      updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -392,7 +392,7 @@ function initDb() {
       payment_mode TEXT NOT NULL,
       notes TEXT,
       received_by INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (invoice_id) REFERENCES invoices(id)
     );
   `);
@@ -415,7 +415,7 @@ function initDb() {
       grand_total REAL NOT NULL DEFAULT 0,
       status TEXT DEFAULT 'issued',
       created_by INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (invoice_id) REFERENCES invoices(id)
     );
   `);
@@ -458,7 +458,7 @@ function initDb() {
       quantity REAL NOT NULL DEFAULT 0,
       remaining_qty REAL NOT NULL DEFAULT 0,
       notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
   `);
@@ -471,9 +471,9 @@ function initDb() {
       description TEXT,
       amount REAL NOT NULL,
       payment_mode TEXT DEFAULT 'CASH',
-      expense_date DATE NOT NULL DEFAULT (DATE('now')),
+      expense_date DATE NOT NULL DEFAULT (date('now', 'localtime')),
       created_by INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -491,8 +491,8 @@ function initDb() {
       cash_expenses REAL DEFAULT 0,
       notes TEXT,
       closed_by INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+      updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -507,7 +507,7 @@ function initDb() {
       entity_id TEXT,
       details TEXT,
       ip_address TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -534,6 +534,9 @@ function initDb() {
   for (const [key, val] of defaultSettings) {
     insertSetting.run(key, val);
   }
+
+  // One-time: shift historical UTC CURRENT_TIMESTAMP values to local wall-clock (IST on shop PCs)
+  localizeLegacyUtcTimestamps();
 
   // Seed default admin & staff users if not present
   const adminCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get('admin@prabhuratna.com', 'admin');
@@ -575,6 +578,80 @@ function initDb() {
     for (const p of sampleProducts) {
       insertProd.run(...p);
     }
+  }
+}
+
+function localizeLegacyUtcTimestamps() {
+  try {
+    const flag = db.prepare("SELECT value FROM settings WHERE key = 'timestamps_localized_v1'").get();
+    if (flag?.value === '1') return;
+
+    // Convert UTC-stored CURRENT_TIMESTAMP values to this machine's local wall-clock
+    const offsetMinutes = -new Date().getTimezoneOffset();
+    if (offsetMinutes === 0) {
+      db.prepare(`
+        INSERT INTO settings (key, value, updated_at)
+        VALUES ('timestamps_localized_v1', '1', datetime('now', 'localtime'))
+        ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = datetime('now', 'localtime')
+      `).run();
+      return;
+    }
+
+    const sign = offsetMinutes >= 0 ? '+' : '-';
+    const absMin = Math.abs(offsetMinutes);
+    const modifier = `${sign}${absMin} minutes`;
+
+    const shifts = [
+      ['users', ['created_at', 'last_login']],
+      ['products', ['created_at', 'updated_at']],
+      ['invoices', ['created_at', 'cancelled_at']],
+      ['invoice_payments', ['created_at']],
+      ['quotations', ['created_at']],
+      ['purchases', ['created_at']],
+      ['returns', ['created_at']],
+      ['inventory_logs', ['created_at']],
+      ['customers', ['created_at', 'updated_at']],
+      ['expenses', ['created_at']],
+      ['cashbook_entries', ['created_at', 'updated_at']],
+      ['credit_notes', ['created_at']],
+      ['audit_logs', ['created_at']],
+      ['suppliers', ['created_at']],
+      ['categories', ['created_at']],
+      ['settings', ['updated_at']]
+    ];
+
+    const tx = db.transaction(() => {
+      for (const [table, cols] of shifts) {
+        const exists = db.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?"
+        ).get(table);
+        if (!exists) continue;
+
+        const tableCols = new Set(
+          db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name)
+        );
+
+        for (const col of cols) {
+          if (!tableCols.has(col)) continue;
+          db.prepare(`
+            UPDATE ${table}
+            SET ${col} = datetime(${col}, ?)
+            WHERE ${col} IS NOT NULL AND TRIM(${col}) != ''
+          `).run(modifier);
+        }
+      }
+
+      db.prepare(`
+        INSERT INTO settings (key, value, updated_at)
+        VALUES ('timestamps_localized_v1', '1', datetime('now', 'localtime'))
+        ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = datetime('now', 'localtime')
+      `).run();
+    });
+
+    tx();
+    console.log(`Localized legacy UTC timestamps by ${modifier}`);
+  } catch (error) {
+    console.warn('Timestamp localization skipped:', error.message);
   }
 }
 

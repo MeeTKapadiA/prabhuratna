@@ -1,5 +1,11 @@
 const QUEUE_KEY = 'prabhuratna_offline_invoice_queue';
 
+function localNowSql() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function readQueue() {
   try {
     const raw = localStorage.getItem(QUEUE_KEY);
@@ -28,7 +34,7 @@ export function enqueueInvoice(payload) {
   const entry = {
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
     payload,
-    created_at: new Date().toISOString()
+    created_at: localNowSql()
   };
   queue.push(entry);
   writeQueue(queue);

@@ -30,7 +30,7 @@ function ensureCustomer({ customer_id, customer_name, customer_phone, customer_e
           email = COALESCE(NULLIF(?, ''), email),
           gstin = COALESCE(NULLIF(?, ''), gstin),
           address = COALESCE(NULLIF(?, ''), address),
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = datetime('now', 'localtime')
         WHERE id = ?
       `).run(name, customer_email || '', customer_gstin || '', customer_address || '', byPhone.id);
       return db.prepare('SELECT * FROM customers WHERE id = ?').get(byPhone.id);
@@ -70,7 +70,7 @@ function adjustProductStock(productId, qtyChange, bucket, changeType, notes, use
     throw error;
   }
 
-  db.prepare(`UPDATE products SET ${field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(next, productId);
+  db.prepare(`UPDATE products SET ${field} = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`).run(next, productId);
   db.prepare(`
     INSERT INTO inventory_logs (product_id, change_type, quantity_change, previous_stock, new_stock, notes, user_id, stock_bucket)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -168,8 +168,8 @@ exports.createInvoice = (req, res) => {
           invoice_number, customer_id, customer_name, customer_phone, customer_email, customer_gstin, customer_pan, customer_address,
           place_of_supply, subtotal, tax_amount, cgst_amount, sgst_amount, igst_amount, tax_type,
           discount_amount, scrap_value, transport_amount, round_off, grand_total,
-          payment_mode, amount_paid, balance_due, payment_status, status, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+          payment_mode, amount_paid, balance_due, payment_status, status, notes, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, datetime('now', 'localtime'))
       `);
 
       const result = invoiceStmt.run(
@@ -252,7 +252,7 @@ exports.createInvoice = (req, res) => {
       }
 
       if (customer?.id && balanceDue > 0) {
-        db.prepare('UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        db.prepare(`UPDATE customers SET current_balance = current_balance + ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
           .run(balanceDue, customer.id);
       }
 
@@ -385,7 +385,7 @@ exports.recordInvoicePayment = (req, res) => {
       `).run(newPaid, newDue, paymentStatus, mode, invoice.id);
 
       if (invoice.customer_id) {
-        db.prepare('UPDATE customers SET current_balance = MAX(0, current_balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        db.prepare(`UPDATE customers SET current_balance = MAX(0, current_balance - ?), updated_at = datetime('now', 'localtime') WHERE id = ?`)
           .run(payAmount, invoice.customer_id);
       }
     });
@@ -426,13 +426,13 @@ exports.cancelInvoice = (req, res) => {
       }
 
       if (invoice.customer_id && Number(invoice.balance_due) > 0) {
-        db.prepare('UPDATE customers SET current_balance = MAX(0, current_balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        db.prepare(`UPDATE customers SET current_balance = MAX(0, current_balance - ?), updated_at = datetime('now', 'localtime') WHERE id = ?`)
           .run(invoice.balance_due, invoice.customer_id);
       }
 
       db.prepare(`
         UPDATE invoices
-        SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, cancel_reason = ?,
+        SET status = 'cancelled', cancelled_at = datetime('now', 'localtime'), cancel_reason = ?,
             balance_due = 0, payment_status = 'cancelled'
         WHERE id = ?
       `).run(reason || 'Cancelled by user', invoice.id);

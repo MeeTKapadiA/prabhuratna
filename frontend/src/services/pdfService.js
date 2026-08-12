@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { formatDate } from './calcService';
 
 const BRAND_COLOR = [192, 57, 43]; // #C0392B (Prabhuratna Red/Maroon)
 
@@ -46,6 +47,67 @@ function hasBankDetails(settings = {}) {
     settings.bank_account_number ||
     settings.bank_ifsc
   );
+}
+
+/** Draw shop name + wrapped address on the left; meta block stays clear on the right. */
+function drawShopHeaderBlock(doc, {
+  shopName,
+  shopAddress,
+  shopGstin,
+  shopPhone,
+  shopEmail,
+  metaRows = [],
+  startY = 36
+}) {
+  const leftX = 14;
+  const leftMaxWidth = 128; // leave gap before meta column at x=150
+  const metaLabelX = 150;
+  const metaValueX = 196;
+  const lineH = 4.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(30, 41, 59);
+  const nameLines = doc.splitTextToSize(String(shopName || ''), leftMaxWidth);
+  let y = startY;
+  nameLines.forEach((line) => {
+    doc.text(line, leftX, y);
+    y += lineH;
+  });
+
+  doc.setFont('helvetica', 'normal');
+  const addressLines = doc.splitTextToSize(String(shopAddress || ''), leftMaxWidth);
+  addressLines.forEach((line) => {
+    doc.text(line, leftX, y);
+    y += lineH;
+  });
+
+  const contactLines = doc.splitTextToSize(
+    `GSTIN: ${shopGstin || 'N/A'} | Ph: ${shopPhone || ''}`,
+    leftMaxWidth
+  );
+  contactLines.forEach((line) => {
+    doc.text(line, leftX, y);
+    y += lineH;
+  });
+  const emailLines = doc.splitTextToSize(`Email: ${shopEmail || ''}`, leftMaxWidth);
+  emailLines.forEach((line) => {
+    doc.text(line, leftX, y);
+    y += lineH;
+  });
+  const leftBottom = y;
+
+  // Right meta — fixed top alignment, never overlaps wrapped address
+  let metaY = startY;
+  metaRows.forEach((row, idx) => {
+    if (idx === 0) doc.setFont('helvetica', 'bold');
+    else doc.setFont('helvetica', 'normal');
+    doc.text(row.label, metaLabelX, metaY);
+    doc.text(String(row.value || ''), metaValueX, metaY, { align: 'right' });
+    metaY += lineH + 0.5;
+  });
+
+  return Math.max(leftBottom, metaY) + 6;
 }
 
 function drawBankDetails(doc, settings, startY) {
@@ -122,30 +184,19 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setFont('helvetica', 'normal');
   doc.text('TAX INVOICE', 196, 16, { align: 'right' });
 
-  // 2. Company Details & Invoice Metadata
-  doc.setTextColor(30, 41, 59);
-  doc.setFontSize(9);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text(shopName, 14, 36);
-  doc.setFont('helvetica', 'normal');
-  doc.text(shopAddress, 14, 41);
-  doc.text(`GSTIN: ${shopGstin} | Ph: ${shopPhone}`, 14, 46);
-  doc.text(`Email: ${shopEmail}`, 14, 51);
-
-  const metaLabelX = 150;
-  const metaValueX = 196;
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('Invoice No:', metaLabelX, 36);
-  doc.text(invoice.invoice_number || '', metaValueX, 36, { align: 'right' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.text('Date:', metaLabelX, 41);
-  doc.text(new Date(invoice.created_at || Date.now()).toLocaleDateString('en-IN'), metaValueX, 41, { align: 'right' });
-
-  doc.text('Payment Mode:', metaLabelX, 46);
-  doc.text(invoice.payment_mode || 'Cash', metaValueX, 46, { align: 'right' });
+  // 2. Company Details & Invoice Metadata (address wraps; no overlap with right meta)
+  const afterHeaderY = drawShopHeaderBlock(doc, {
+    shopName,
+    shopAddress,
+    shopGstin,
+    shopPhone,
+    shopEmail,
+    metaRows: [
+      { label: 'Invoice No:', value: invoice.invoice_number || '' },
+      { label: 'Date:', value: formatDate(invoice.created_at || new Date()) },
+      { label: 'Payment Mode:', value: invoice.payment_mode || 'Cash' }
+    ]
+  });
 
   // 3. Customer Info Box (GSTIN / PAN only when filled)
   const customerGstin = (invoice.customer_gstin || '').trim();
@@ -160,16 +211,18 @@ export function generateInvoicePDF(invoice, options = {}) {
   const boxHeight = 14 + billedLines.length * 5;
   doc.setDrawColor(226, 232, 240);
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(14, 57, 182, boxHeight, 2, 2, 'FD');
+  doc.roundedRect(14, afterHeaderY, 182, boxHeight, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Billed To:', 18, 64);
+  doc.setFontSize(9);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Billed To:', 18, afterHeaderY + 7);
   doc.setFont('helvetica', 'normal');
   billedLines.forEach((line, i) => {
-    doc.text(line, 18, 70 + i * 5);
+    doc.text(line, 18, afterHeaderY + 13 + i * 5);
   });
 
-  const tableStartY = 57 + boxHeight + 6;
+  const tableStartY = afterHeaderY + boxHeight + 6;
 
   // 4. Items Table
   const tableData = (invoice.items || []).map((item, idx) => {
@@ -325,30 +378,22 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFont('helvetica', 'normal');
   doc.text('COMMERCIAL QUOTATION', 196, 16, { align: 'right' });
 
-  doc.setTextColor(30, 41, 59);
-  doc.setFontSize(9);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text(shopName, 14, 36);
-  doc.setFont('helvetica', 'normal');
-  doc.text(shopAddress, 14, 41);
-  doc.text(`GSTIN: ${shopGstin} | Ph: ${shopPhone}`, 14, 46);
-  doc.text(`Email: ${shopEmail}`, 14, 51);
-
-  const metaLabelX = 150;
-  const metaValueX = 196;
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('Quotation No:', metaLabelX, 36);
-  doc.text(quotation.quotation_number || '', metaValueX, 36, { align: 'right' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.text('Date:', metaLabelX, 41);
-  doc.text(new Date(quotation.created_at || Date.now()).toLocaleDateString('en-IN'), metaValueX, 41, { align: 'right' });
+  const metaRows = [
+    { label: 'Quotation No:', value: quotation.quotation_number || '' },
+    { label: 'Date:', value: formatDate(quotation.created_at || new Date()) }
+  ];
   if (quotation.valid_until) {
-    doc.text('Valid Until:', metaLabelX, 46);
-    doc.text(new Date(quotation.valid_until).toLocaleDateString('en-IN'), metaValueX, 46, { align: 'right' });
+    metaRows.push({ label: 'Valid Until:', value: formatDate(quotation.valid_until) });
   }
+
+  const afterHeaderY = drawShopHeaderBlock(doc, {
+    shopName,
+    shopAddress,
+    shopGstin,
+    shopPhone,
+    shopEmail,
+    metaRows
+  });
 
   const customerGstin = (quotation.customer_gstin || '').trim();
   const customerPan = (quotation.customer_pan || '').trim();
@@ -362,16 +407,18 @@ export function generateQuotationPDF(quotation, options = {}) {
   const boxHeight = 14 + quoteLines.length * 5;
   doc.setDrawColor(226, 232, 240);
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(14, 53, 182, boxHeight, 2, 2, 'FD');
+  doc.roundedRect(14, afterHeaderY, 182, boxHeight, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Quotation Prepared For:', 18, 60);
+  doc.setFontSize(9);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Quotation Prepared For:', 18, afterHeaderY + 7);
   doc.setFont('helvetica', 'normal');
   quoteLines.forEach((line, i) => {
-    doc.text(line, 18, 66 + i * 5);
+    doc.text(line, 18, afterHeaderY + 13 + i * 5);
   });
 
-  const tableStartY = 53 + boxHeight + 6;
+  const tableStartY = afterHeaderY + boxHeight + 6;
 
   const tableData = (quotation.items || []).map((item, idx) => {
     const discVal = parseFloat(item.discount_percent);

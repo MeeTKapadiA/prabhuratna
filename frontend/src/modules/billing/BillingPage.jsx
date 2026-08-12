@@ -5,7 +5,7 @@ import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
-import { calculateCartTotals, formatCurrency } from '../../services/calcService';
+import { calculateCartTotals, formatCurrency, formatDateTime } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
 import { useShopSettings } from '../../context/ShopSettingsContext';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
@@ -846,7 +846,7 @@ export default function BillingPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 dark:text-[#9CA3AF]">Date & Time:</span>
-                <span>{new Date(completedInvoice.created_at).toLocaleString('en-IN')}</span>
+                <span>{formatDateTime(completedInvoice.created_at)}</span>
               </div>
               {parseFloat(completedInvoice.scrap_value) > 0 && (
                 <div className="flex justify-between">

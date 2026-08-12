@@ -115,7 +115,7 @@ exports.createCreditNote = (req, res) => {
             payment_status = CASE WHEN MAX(0, balance_due - ?) <= 0 THEN 'paid' ELSE payment_status END
           WHERE id = ?
         `).run(reduce, reduce, invoice.id);
-        db.prepare('UPDATE customers SET current_balance = MAX(0, current_balance - ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        db.prepare(`UPDATE customers SET current_balance = MAX(0, current_balance - ?), updated_at = datetime('now', 'localtime') WHERE id = ?`)
           .run(reduce, invoice.customer_id);
       }
 

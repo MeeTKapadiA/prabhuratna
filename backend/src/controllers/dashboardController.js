@@ -7,17 +7,17 @@ exports.getDashboardStats = (req, res) => {
 
     const todaySales = db.prepare(`
       SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count
-      FROM invoices WHERE DATE(created_at) = DATE('now') AND ${activeInvoiceFilter}
+      FROM invoices WHERE DATE(created_at) = date('now', 'localtime') AND ${activeInvoiceFilter}
     `).get();
 
     const weeklySales = db.prepare(`
       SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count
-      FROM invoices WHERE DATE(created_at) >= DATE('now', '-7 days') AND ${activeInvoiceFilter}
+      FROM invoices WHERE DATE(created_at) >= date('now', 'localtime', '-7 days') AND ${activeInvoiceFilter}
     `).get();
 
     const monthlySales = db.prepare(`
       SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count
-      FROM invoices WHERE DATE(created_at) >= DATE('now', '-30 days') AND ${activeInvoiceFilter}
+      FROM invoices WHERE DATE(created_at) >= date('now', 'localtime', '-30 days') AND ${activeInvoiceFilter}
     `).get();
 
     const staffToday = req.user?.role === 'staff'
@@ -25,7 +25,7 @@ exports.getDashboardStats = (req, res) => {
           SELECT COALESCE(SUM(grand_total), 0) as total, COUNT(*) as count,
             COALESCE(SUM(balance_due), 0) as pending_due
           FROM invoices
-          WHERE DATE(created_at) = DATE('now') AND ${activeInvoiceFilter}
+          WHERE DATE(created_at) = date('now', 'localtime') AND ${activeInvoiceFilter}
             AND (created_by = ? OR created_by IS NULL)
         `).get(req.user.id)
       : todaySales;
@@ -101,7 +101,7 @@ exports.getDashboardStats = (req, res) => {
         SUM(grand_total) as sales,
         COUNT(*) as invoices
       FROM invoices
-      WHERE DATE(created_at) >= DATE('now', '-7 days') AND ${activeInvoiceFilter}
+      WHERE DATE(created_at) >= date('now', 'localtime', '-7 days') AND ${activeInvoiceFilter}
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at) ASC
     `).all();

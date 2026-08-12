@@ -2,6 +2,52 @@
  * Reusable Calculation & Indian Currency Utilities for POS Billing, Invoices, Quotations & Reports
  */
 
+/** Local calendar date YYYY-MM-DD from the browser/system clock (not UTC). */
+export function todayLocalDate() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Parse app timestamps as local wall-clock.
+ * SQLite stores "YYYY-MM-DD HH:MM:SS" without timezone — treat as system local time.
+ */
+export function parseAppDate(dateStr) {
+  if (!dateStr && dateStr !== 0) return null;
+  if (dateStr instanceof Date) {
+    return Number.isNaN(dateStr.getTime()) ? null : dateStr;
+  }
+
+  const raw = String(dateStr).trim();
+  if (!raw) return null;
+
+  // Already has explicit timezone (Z or ±HH:MM)
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw)) {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  // YYYY-MM-DD or YYYY-MM-DD[ T]HH:MM[:SS]
+  const m = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/
+  );
+  if (m) {
+    const d = new Date(
+      Number(m[1]),
+      Number(m[2]) - 1,
+      Number(m[3]),
+      Number(m[4] || 0),
+      Number(m[5] || 0),
+      Number(m[6] || 0)
+    );
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const fallback = new Date(raw);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
 export function calculateItemTotal(unitPrice = 0, quantity = 1, discountPercent = 0, gstPercent = 0) {
   const price = parseFloat(unitPrice);
   const validPrice = isNaN(price) ? 0 : price;
@@ -85,9 +131,9 @@ export function formatCurrency(amount = 0, showDecimals = false) {
 export function formatDate(dateStr, includeTime = false) {
   if (!dateStr) return 'N/A';
   try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return String(dateStr);
-    
+    const d = parseAppDate(dateStr);
+    if (!d) return String(dateStr);
+
     const day = String(d.getDate()).padStart(2, '0');
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const month = monthNames[d.getMonth()];
@@ -108,4 +154,9 @@ export function formatDate(dateStr, includeTime = false) {
   } catch (e) {
     return String(dateStr);
   }
+}
+
+/** Date + time for UI that previously used toLocaleString('en-IN'). */
+export function formatDateTime(dateStr) {
+  return formatDate(dateStr, true);
 }

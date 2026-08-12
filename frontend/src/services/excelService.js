@@ -1,3 +1,5 @@
+import { todayLocalDate } from './calcService';
+
 export async function exportToExcel(data, fileName = 'report') {
   if (!data || !Array.isArray(data) || data.length === 0) {
     alert('No data available to export');
@@ -33,7 +35,7 @@ export async function exportToExcel(data, fileName = 'report') {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${fileName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.download = `${fileName}_${todayLocalDate()}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

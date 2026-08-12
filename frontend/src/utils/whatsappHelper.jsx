@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDate } from '../services/calcService';
 
 export function WhatsAppIcon({ className = "w-4 h-4" }) {
   return (
@@ -21,7 +22,7 @@ export function shareOnWhatsApp(type = 'invoice', item = {}, settings = {}, noti
 
   const isInvoice = type === 'invoice';
   const docNumber = isInvoice ? item.invoice_number : item.quotation_number;
-  const docDate = new Date(item.created_at || Date.now()).toLocaleDateString('en-IN');
+  const docDate = formatDate(item.created_at || new Date());
   const itemCount = item.items ? item.items.length : 0;
   
   const formattedAmount = new Intl.NumberFormat('en-IN', {

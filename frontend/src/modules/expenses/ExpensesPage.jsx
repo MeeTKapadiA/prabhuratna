@@ -9,7 +9,7 @@ import StatCard from '../../components/ui/StatCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
-import { formatCurrency, formatDate } from '../../services/calcService';
+import {formatCurrency, formatDate, todayLocalDate} from '../../services/calcService';
 import { Receipt, Plus, Trash2, IndianRupee } from 'lucide-react';
 
 const CATEGORIES = ['Rent', 'Salary', 'Transport', 'Utilities', 'Maintenance', 'Marketing', 'Misc'];
@@ -29,7 +29,7 @@ export default function ExpensesPage() {
     description: '',
     amount: '',
     payment_mode: 'CASH',
-    expense_date: new Date().toISOString().slice(0, 10)
+    expense_date: todayLocalDate()
   });
   const [toast, setToast] = useState({ isOpen: false, type: 'info', message: '' });
 
@@ -68,7 +68,7 @@ export default function ExpensesPage() {
           description: '',
           amount: '',
           payment_mode: 'CASH',
-          expense_date: new Date().toISOString().slice(0, 10)
+          expense_date: todayLocalDate()
         });
         fetchExpenses();
       }

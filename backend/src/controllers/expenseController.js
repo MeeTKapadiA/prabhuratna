@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { roundMoney } = require('../utils/saleItems');
 const { auditFromReq } = require('../utils/audit');
+const { todayLocalSql } = require('../utils/datetime');
 
 const CATEGORIES = ['Rent', 'Salary', 'Transport', 'Utilities', 'Maintenance', 'Marketing', 'Misc'];
 
@@ -38,14 +39,14 @@ exports.createExpense = (req, res) => {
       return res.status(400).json({ success: false, message: 'Category and positive amount are required' });
     }
     const result = db.prepare(`
-      INSERT INTO expenses (category, description, amount, payment_mode, expense_date, created_by)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO expenses (category, description, amount, payment_mode, expense_date, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(
       category,
       description || '',
       amt,
       String(payment_mode || 'CASH').toUpperCase(),
-      expense_date || new Date().toISOString().slice(0, 10),
+      expense_date || todayLocalSql(),
       req.user?.id || null
     );
     const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);

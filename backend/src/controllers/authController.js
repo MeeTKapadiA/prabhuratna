@@ -26,7 +26,7 @@ exports.login = (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid username or password' });
     }
 
-    db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+    db.prepare(`UPDATE users SET last_login = datetime('now', 'localtime') WHERE id = ?`).run(user.id);
 
     const token = jwt.sign(
       { id: user.id, username: user.username, email: user.email, name: user.name, role: user.role },

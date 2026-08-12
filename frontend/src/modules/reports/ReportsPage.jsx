@@ -5,7 +5,7 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
+import { formatCurrency, formatDate, todayLocalDate } from '../../services/calcService';
 import { exportToExcel } from '../../services/excelService';
 import { useAuth } from '../../context/AuthContext';
 import { BarChart3, FileSpreadsheet, Download, Calendar, Filter, Printer, Database, FileText, HardDrive, Package, ShoppingBag, RotateCcw } from 'lucide-react';
@@ -82,13 +82,13 @@ export default function ReportsPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `prabhuratna_backup_${new Date().toISOString().slice(0,10)}.sqlite`;
+      a.download = `prabhuratna_backup_${todayLocalDate()}.sqlite`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
 
-      const timestamp = new Date().toLocaleString('en-IN');
+      const timestamp = formatDate(new Date(), true);
       localStorage.setItem('prabhuratna_last_backup', timestamp);
       setLastBackupTime(timestamp);
       setToast({ isOpen: true, type: 'success', message: 'Full database backup downloaded!' });
@@ -113,7 +113,7 @@ export default function ReportsPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `prabhuratna_${type}_${new Date().toISOString().slice(0,10)}.csv`;
+      a.download = `prabhuratna_${type}_${todayLocalDate()}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -131,7 +131,7 @@ export default function ReportsPage() {
         { header: 'Invoice Number', accessor: 'invoice_number' },
         {
           header: 'Date',
-          render: (row) => new Date(row.created_at).toLocaleDateString('en-IN')
+          render: (row) => formatDate(row.created_at)
         },
         { header: 'Customer', accessor: 'customer_name' },
         { header: 'Payment Mode', render: (row) => <Badge variant="info">{row.payment_mode}</Badge> },

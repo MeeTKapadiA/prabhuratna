@@ -59,7 +59,7 @@ exports.createReturn = (req, res) => {
       `);
 
       const updateStockStmt = db.prepare(`
-        UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = datetime('now', 'localtime') WHERE id = ?
       `);
 
       const logStmt = db.prepare(`
@@ -101,7 +101,7 @@ exports.createReturn = (req, res) => {
             } else {
               const prevDamaged = Number(prod.damaged_stock) || 0;
               const newDamaged = prevDamaged + qty;
-              db.prepare('UPDATE products SET damaged_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+              db.prepare(`UPDATE products SET damaged_stock = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
                 .run(newDamaged, item.product_id);
               logStmt.run(
                 item.product_id,

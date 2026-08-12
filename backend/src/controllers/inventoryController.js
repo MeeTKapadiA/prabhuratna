@@ -90,7 +90,7 @@ exports.getFastMovingProducts = (req, res) => {
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       LEFT JOIN products p ON ii.product_id = p.id
-      WHERE DATE(i.created_at) >= DATE('now', '-' || ? || ' days')
+      WHERE DATE(i.created_at) >= date('now', 'localtime', '-' || ? || ' days')
       GROUP BY ii.product_id, ii.product_name
       ORDER BY total_quantity_sold DESC
       LIMIT 10
@@ -124,7 +124,7 @@ exports.getSlowMovingProducts = (req, res) => {
         COALESCE(SUM(ii.quantity), 0) as sales_in_period
       FROM products p
       LEFT JOIN invoice_items ii ON p.id = ii.product_id
-      LEFT JOIN invoices i ON ii.invoice_id = i.id AND DATE(i.created_at) >= DATE('now', '-' || ? || ' days')
+      LEFT JOIN invoices i ON ii.invoice_id = i.id AND DATE(i.created_at) >= date('now', 'localtime', '-' || ? || ' days')
       WHERE p.is_active = 1
       GROUP BY p.id
       HAVING sales_in_period = 0 OR p.stock_quantity > (p.min_stock_level * 3)

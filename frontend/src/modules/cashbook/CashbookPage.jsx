@@ -5,13 +5,13 @@ import DataTable from '../../components/ui/DataTable';
 import Toast from '../../components/ui/Toast';
 import StatCard from '../../components/ui/StatCard';
 import { apiRequest } from '../../services/api';
-import { formatCurrency } from '../../services/calcService';
+import {formatCurrency, todayLocalDate} from '../../services/calcService';
 import { useAuth } from '../../context/AuthContext';
 import { BookOpen, Save, Banknote, CreditCard, Smartphone, Wallet, Receipt } from 'lucide-react';
 
 export default function CashbookPage() {
   const { isAdmin } = useAuth();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayLocalDate());
   const [openingCash, setOpeningCash] = useState('0');
   const [closingCash, setClosingCash] = useState('');
   const [notes, setNotes] = useState('');

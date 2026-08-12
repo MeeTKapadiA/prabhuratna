@@ -563,7 +563,7 @@ export default function PurchasesPage() {
               </div>
               <div>
                 <p className="text-slate-500">Purchase Date:</p>
-                <p className="font-bold">{new Date(selectedPurchase.created_at).toLocaleDateString('en-IN')}</p>
+                <p className="font-bold">{formatDate(selectedPurchase.created_at, true)}</p>
                 <p className="text-slate-500">Payment Status: {getStatusBadge(selectedPurchase.payment_status)}</p>
               </div>
             </div>

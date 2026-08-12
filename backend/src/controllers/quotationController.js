@@ -53,8 +53,8 @@ exports.createQuotation = (req, res) => {
         INSERT INTO quotations (
           quotation_number, customer_name, customer_phone, customer_email, customer_address,
           customer_gstin, customer_pan,
-          subtotal, tax_amount, discount_amount, grand_total, notes, valid_until
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          subtotal, tax_amount, discount_amount, grand_total, notes, valid_until, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
       `);
 
       const result = qtnStmt.run(

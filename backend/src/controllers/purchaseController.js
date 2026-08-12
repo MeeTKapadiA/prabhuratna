@@ -77,7 +77,7 @@ exports.createPurchase = (req, res) => {
 
       const updateProdStmt = db.prepare(`
         UPDATE products 
-        SET stock_quantity = stock_quantity + ?, purchase_price = ?, updated_at = CURRENT_TIMESTAMP
+        SET stock_quantity = stock_quantity + ?, purchase_price = ?, updated_at = datetime('now', 'localtime')
         WHERE id = ?
       `);
 

@@ -134,8 +134,12 @@ export default function QuotationsPage() {
     }
 
     try {
+      const days = parseInt(validDays, 10) || 15;
       const validUntil = new Date();
-      validUntil.setDate(validUntil.getDate() + (parseInt(validDays) || 15));
+      validUntil.setHours(0, 0, 0, 0);
+      validUntil.setDate(validUntil.getDate() + days);
+      const pad = (n) => String(n).padStart(2, '0');
+      const validUntilLocal = `${validUntil.getFullYear()}-${pad(validUntil.getMonth() + 1)}-${pad(validUntil.getDate())}`;
 
       const payload = {
         customer_name: customerName,
@@ -145,7 +149,7 @@ export default function QuotationsPage() {
         customer_gstin: customerGstin,
         customer_pan: customerPan,
         notes,
-        valid_until: validUntil.toISOString().split('T')[0],
+        valid_until: validUntilLocal,
         items: qtnItems
       };
 

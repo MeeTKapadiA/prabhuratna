@@ -75,7 +75,7 @@ exports.saveCashbook = (req, res) => {
     db.prepare(`
       INSERT INTO cashbook_entries (
         entry_date, opening_cash, closing_cash, cash_sales, upi_sales, card_sales, credit_sales, cash_expenses, notes, closed_by, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
       ON CONFLICT(entry_date) DO UPDATE SET
         opening_cash = excluded.opening_cash,
         closing_cash = excluded.closing_cash,
@@ -86,7 +86,7 @@ exports.saveCashbook = (req, res) => {
         cash_expenses = excluded.cash_expenses,
         notes = excluded.notes,
         closed_by = excluded.closed_by,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = datetime('now', 'localtime')
     `).run(
       date,
       opening,

@@ -241,7 +241,7 @@ exports.updateProduct = (req, res) => {
         damaged_stock = ?,
         display_stock = ?,
         scrap_stock = ?,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `);
 
@@ -337,7 +337,7 @@ exports.toggleWebsiteVisibility = (req, res) => {
     }
 
     const newVisibility = existing.show_on_website === 1 ? 0 : 1;
-    db.prepare('UPDATE products SET show_on_website = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newVisibility, id);
+    db.prepare(`UPDATE products SET show_on_website = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`).run(newVisibility, id);
 
     const updated = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
     return res.json({

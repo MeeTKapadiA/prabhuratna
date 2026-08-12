@@ -54,7 +54,7 @@ exports.updateCustomer = (req, res) => {
     const { name, phone, email, address, gstin, notes } = req.body;
     db.prepare(`
       UPDATE customers SET
-        name = ?, phone = ?, email = ?, address = ?, gstin = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+        name = ?, phone = ?, email = ?, address = ?, gstin = ?, notes = ?, updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `).run(
       name || existing.name,

@@ -11,8 +11,8 @@ function writeAuditLog({
 }) {
   try {
     db.prepare(`
-      INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, ip_address, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(
       userId,
       username,

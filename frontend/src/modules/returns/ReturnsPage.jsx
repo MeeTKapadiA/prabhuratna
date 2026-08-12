@@ -294,7 +294,7 @@ export default function ReturnsPage() {
                   <h3 className="text-base font-bold text-slate-900 dark:text-[#F1F1F1]">
                     Step 2: Select Items & Refund Mode for {foundInvoice.invoice_number}
                   </h3>
-                  <p className="text-xs text-slate-500">Original Sale Date: {new Date(foundInvoice.created_at).toLocaleDateString('en-IN')}</p>
+                  <p className="text-xs text-slate-500">Original Sale Date: {formatDate(foundInvoice.created_at)}</p>
                 </div>
                 <Badge variant="info">Invoice Total: {formatCurrency(foundInvoice.grand_total)}</Badge>
               </div>
@@ -477,7 +477,7 @@ export default function ReturnsPage() {
               </div>
               <div>
                 <p className="text-slate-500">Return Date:</p>
-                <p className="font-bold">{new Date(selectedReturn.created_at).toLocaleDateString('en-IN')}</p>
+                <p className="font-bold">{formatDate(selectedReturn.created_at, true)}</p>
                 <p className="text-slate-500">Refund Mode: <Badge variant="success">{selectedReturn.refund_mode.toUpperCase()}</Badge></p>
               </div>
             </div>

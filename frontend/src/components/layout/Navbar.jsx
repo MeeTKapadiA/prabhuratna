@@ -11,10 +11,12 @@ export default function Navbar({ toggleSidebar, isSidebarCollapsed, toggleSideba
   const { isDark, toggleTheme } = useTheme();
   const { shopName } = useShopSettings();
   const navigate = useNavigate();
-  const [time, setTime] = useState(new Date().toLocaleTimeString());
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
 
   useEffect(() => {
-    const timer = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
+    const timer = setInterval(() => {
+      setTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
