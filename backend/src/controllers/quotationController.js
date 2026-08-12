@@ -9,6 +9,8 @@ exports.createQuotation = (req, res) => {
       customer_phone,
       customer_email,
       customer_address,
+      customer_gstin,
+      customer_pan,
       discount_amount,
       notes,
       valid_until,
@@ -50,8 +52,9 @@ exports.createQuotation = (req, res) => {
       const qtnStmt = db.prepare(`
         INSERT INTO quotations (
           quotation_number, customer_name, customer_phone, customer_email, customer_address,
+          customer_gstin, customer_pan,
           subtotal, tax_amount, discount_amount, grand_total, notes, valid_until
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const result = qtnStmt.run(
@@ -60,6 +63,8 @@ exports.createQuotation = (req, res) => {
         customer_phone || '',
         customer_email || '',
         customer_address || '',
+        customer_gstin || '',
+        customer_pan || '',
         finalSubtotal,
         finalTax,
         finalDiscount,
@@ -72,9 +77,9 @@ exports.createQuotation = (req, res) => {
 
       const itemStmt = db.prepare(`
         INSERT INTO quotation_items (
-          quotation_id, product_id, product_name, barcode, unit_price, quantity,
+          quotation_id, product_id, product_name, barcode, hsn_sac, unit_price, quantity,
           discount_percent, gst_percent, total_price
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const item of processedItems) {
@@ -83,6 +88,7 @@ exports.createQuotation = (req, res) => {
           item.product_id || null,
           item.product_name,
           item.barcode || '',
+          item.hsn_sac || item.hsn_code || '',
           item.unit_price,
           item.quantity,
           item.discount_percent,

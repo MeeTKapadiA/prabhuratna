@@ -11,7 +11,11 @@ const ALLOWED_SETTING_KEYS = [
   'logo_url',
   'invoice_footer_note',
   'owner_whatsapp',
-  'low_stock_alert_enabled'
+  'low_stock_alert_enabled',
+  'bank_name',
+  'bank_branch',
+  'bank_account_number',
+  'bank_ifsc'
 ];
 
 function readSettings() {

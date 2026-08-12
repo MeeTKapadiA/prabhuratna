@@ -4,7 +4,7 @@ const { roundMoney } = require('../utils/saleItems');
 const { processGstSaleItems, computeInvoiceTotals } = require('../utils/gst');
 const { auditFromReq } = require('../utils/audit');
 
-const ALLOWED_PAYMENT_MODES = new Set(['CASH', 'UPI', 'CARD', 'MIXED', 'CREDIT']);
+const ALLOWED_PAYMENT_MODES = new Set(['CASH', 'UPI', 'CARD', 'MIXED', 'CREDIT', 'NEFT', 'RTGS']);
 
 function getShopSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
@@ -85,6 +85,7 @@ exports.createInvoice = (req, res) => {
       customer_phone,
       customer_email,
       customer_gstin,
+      customer_pan,
       customer_address,
       place_of_supply,
       discount_amount: rawDiscountAmount,
@@ -164,11 +165,11 @@ exports.createInvoice = (req, res) => {
 
       const invoiceStmt = db.prepare(`
         INSERT INTO invoices (
-          invoice_number, customer_id, customer_name, customer_phone, customer_email, customer_gstin, customer_address,
+          invoice_number, customer_id, customer_name, customer_phone, customer_email, customer_gstin, customer_pan, customer_address,
           place_of_supply, subtotal, tax_amount, cgst_amount, sgst_amount, igst_amount, tax_type,
           discount_amount, scrap_value, transport_amount, round_off, grand_total,
           payment_mode, amount_paid, balance_due, payment_status, status, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
       `);
 
       const result = invoiceStmt.run(
@@ -178,6 +179,7 @@ exports.createInvoice = (req, res) => {
         customer_phone || customer?.phone || '',
         customer_email || customer?.email || '',
         customer_gstin || customer?.gstin || '',
+        customer_pan || '',
         customer_address || customer?.address || '',
         place_of_supply || '',
         finalSubtotal,

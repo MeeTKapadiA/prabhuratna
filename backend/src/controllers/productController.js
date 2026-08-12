@@ -16,9 +16,9 @@ exports.getAllProducts = (req, res) => {
     }
 
     if (search) {
-      query += ` AND (name LIKE ? OR barcode LIKE ? OR sku LIKE ? OR category LIKE ? OR brand LIKE ?)`;
+      query += ` AND (name LIKE ? OR sku LIKE ? OR category LIKE ? OR brand LIKE ? OR COALESCE(hsn_code, '') LIKE ? OR COALESCE(hsn_sac, '') LIKE ?)`;
       const term = `%${search}%`;
-      params.push(term, term, term, term, term);
+      params.push(term, term, term, term, term, term);
     }
 
     if (category) {
@@ -66,21 +66,6 @@ exports.getPublicCatalogProducts = (req, res) => {
   }
 };
 
-exports.getProductByBarcode = (req, res) => {
-  try {
-    const { barcode } = req.params;
-    const product = db.prepare('SELECT * FROM products WHERE (barcode = ? OR sku = ?) AND is_active = 1').get(barcode, barcode);
-    
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
-    }
-
-    return res.json({ success: true, product });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Error searching barcode' });
-  }
-};
-
 exports.getProductById = (req, res) => {
   try {
     const { id } = req.params;
@@ -111,6 +96,7 @@ exports.createProduct = (req, res) => {
       image_url,
       show_on_website,
       hsn_sac,
+      hsn_code,
       unit,
       size_variant,
       gauge,
@@ -126,10 +112,10 @@ exports.createProduct = (req, res) => {
     const allowedUnits = ['pcs', 'kg', 'set', 'box', 'meter', 'pair'];
     const finalUnit = allowedUnits.includes(String(unit || '').toLowerCase()) ? String(unit).toLowerCase() : 'pcs';
 
-    // Auto generate barcode if missing
-    const finalBarcode = barcode || `890${Date.now().toString().slice(-9)}`;
+    const normalizedHsn = String(hsn_code || hsn_sac || '').replace(/\D/g, '').slice(0, 8);
+    // Keep barcode column for historical compatibility but do not auto-generate
+    const finalBarcode = barcode ? String(barcode).trim() : '';
 
-    // Check SKU or Barcode conflict
     const existingSku = db.prepare('SELECT id FROM products WHERE sku = ?').get(sku);
     if (existingSku) {
       return res.status(400).json({ success: false, message: 'A product with this SKU already exists' });
@@ -146,13 +132,13 @@ exports.createProduct = (req, res) => {
       INSERT INTO products (
         name, barcode, sku, category, brand, purchase_price, selling_price,
         discount_percent, gst_percent, stock_quantity, min_stock_level, image_url, show_on_website,
-        hsn_sac, unit, size_variant, gauge, damaged_stock, display_stock, scrap_stock
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        hsn_sac, hsn_code, unit, size_variant, gauge, damaged_stock, display_stock, scrap_stock
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
       name,
-      finalBarcode,
+      finalBarcode || null,
       sku,
       category || 'General',
       brand || 'Generic',
@@ -164,7 +150,8 @@ exports.createProduct = (req, res) => {
       parseInt(min_stock_level) || 5,
       image_url || null,
       show_on_website !== undefined ? (show_on_website ? 1 : 0) : 1,
-      hsn_sac || '',
+      normalizedHsn,
+      normalizedHsn,
       finalUnit,
       size_variant || '',
       gauge || '',
@@ -173,7 +160,6 @@ exports.createProduct = (req, res) => {
       parseFloat(scrap_stock) || 0
     );
 
-    // Log initial stock inventory if > 0
     if (parseInt(stock_quantity) > 0) {
       db.prepare(`
         INSERT INTO inventory_logs (product_id, change_type, quantity_change, previous_stock, new_stock, notes)
@@ -213,6 +199,7 @@ exports.updateProduct = (req, res) => {
       is_active,
       show_on_website,
       hsn_sac,
+      hsn_code,
       unit,
       size_variant,
       gauge,
@@ -225,6 +212,10 @@ exports.updateProduct = (req, res) => {
     const finalUnit = unit !== undefined
       ? (allowedUnits.includes(String(unit).toLowerCase()) ? String(unit).toLowerCase() : existing.unit || 'pcs')
       : (existing.unit || 'pcs');
+
+    const nextHsn = hsn_code !== undefined || hsn_sac !== undefined
+      ? String(hsn_code !== undefined ? hsn_code : hsn_sac).replace(/\D/g, '').slice(0, 8)
+      : (existing.hsn_code || existing.hsn_sac || '');
 
     const stmt = db.prepare(`
       UPDATE products SET
@@ -243,6 +234,7 @@ exports.updateProduct = (req, res) => {
         is_active = ?,
         show_on_website = ?,
         hsn_sac = ?,
+        hsn_code = ?,
         unit = ?,
         size_variant = ?,
         gauge = ?,
@@ -255,7 +247,7 @@ exports.updateProduct = (req, res) => {
 
     stmt.run(
       name || existing.name,
-      barcode || existing.barcode,
+      barcode !== undefined ? (barcode || null) : existing.barcode,
       sku || existing.sku,
       category || existing.category,
       brand || existing.brand,
@@ -268,7 +260,8 @@ exports.updateProduct = (req, res) => {
       image_url !== undefined ? image_url : existing.image_url,
       is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active,
       show_on_website !== undefined ? (show_on_website ? 1 : 0) : existing.show_on_website,
-      hsn_sac !== undefined ? hsn_sac : (existing.hsn_sac || ''),
+      nextHsn,
+      nextHsn,
       finalUnit,
       size_variant !== undefined ? size_variant : (existing.size_variant || ''),
       gauge !== undefined ? gauge : (existing.gauge || ''),

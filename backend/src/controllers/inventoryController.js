@@ -52,7 +52,7 @@ exports.getInventoryLogs = (req, res) => {
   try {
     const { product_id, limit = 50 } = req.query;
     let query = `
-      SELECT l.*, p.name as product_name, p.sku, p.barcode
+      SELECT l.*, p.name as product_name, p.sku, COALESCE(p.hsn_code, p.hsn_sac, '') as hsn_code
       FROM inventory_logs l
       JOIN products p ON l.product_id = p.id
     `;
@@ -82,7 +82,7 @@ exports.getFastMovingProducts = (req, res) => {
         COALESCE(p.name, ii.product_name) as name,
         COALESCE(p.category, 'General') as category,
         COALESCE(p.stock_quantity, 0) as stock_quantity,
-        ii.barcode,
+        COALESCE(NULLIF(ii.hsn_sac, ''), p.hsn_code, p.hsn_sac, '') as hsn_code,
         SUM(ii.quantity) as total_quantity_sold,
         SUM(ii.quantity) as total_units_sold,
         SUM(ii.total_price) as total_revenue,
@@ -113,7 +113,7 @@ exports.getSlowMovingProducts = (req, res) => {
         p.id,
         p.name,
         p.sku,
-        p.barcode,
+        COALESCE(p.hsn_code, p.hsn_sac, '') as hsn_code,
         p.category,
         p.brand,
         p.stock_quantity,
@@ -147,7 +147,7 @@ exports.getReconciliationReport = (req, res) => {
         p.id,
         p.name,
         p.sku,
-        p.barcode,
+        COALESCE(p.hsn_code, p.hsn_sac, '') as hsn_code,
         p.category,
         p.stock_quantity as current_stock,
         COALESCE((SELECT SUM(ii.quantity) FROM invoice_items ii WHERE ii.product_id = p.id), 0) as total_sold,

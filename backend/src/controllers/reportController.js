@@ -55,7 +55,7 @@ exports.getInventoryReport = (req, res) => {
     const { category, brand } = req.query;
     let query = `
       SELECT 
-        id, name, barcode, sku, category, brand,
+        id, name, COALESCE(hsn_code, hsn_sac, '') as hsn_code, sku, category, brand,
         purchase_price, selling_price, stock_quantity, min_stock_level,
         (stock_quantity * purchase_price) as cost_value,
         (stock_quantity * selling_price) as retail_value,
@@ -101,7 +101,7 @@ exports.getProfitReport = (req, res) => {
       SELECT 
         ii.product_name,
         COALESCE(p.sku, 'N/A') as sku,
-        COALESCE(p.barcode, 'N/A') as barcode,
+        COALESCE(NULLIF(p.hsn_code, ''), NULLIF(p.hsn_sac, ''), 'N/A') as hsn_code,
         SUM(ii.quantity) as total_sold,
         SUM(ii.quantity * COALESCE(p.purchase_price, 0)) as total_cost,
         SUM(ii.total_price) as total_revenue,

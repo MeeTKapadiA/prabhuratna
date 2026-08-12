@@ -49,7 +49,7 @@ function processGstSaleItems(items = [], { shopGstin, customerGstin, isInterStat
     const disc = Math.min(100, Math.max(0, Number.parseFloat(item.discount_percent) || 0));
     const gst = Math.min(40, Math.max(0, Number.parseFloat(item.gst_percent) || 0));
     const unit = String(item.unit || 'pcs').slice(0, 16);
-    const hsn = String(item.hsn_sac || item.hsn || '').slice(0, 16);
+    const hsn = String(item.hsn_sac || item.hsn_code || item.hsn || '').replace(/\D/g, '').slice(0, 8);
 
     const base = uPrice * qty;
     const itemDisc = base * (disc / 100);

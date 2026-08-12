@@ -9,7 +9,6 @@ router.get('/public', productController.getPublicCatalogProducts);
 // Authenticated routes
 router.get('/', authenticateToken, productController.getAllProducts);
 router.get('/alerts/low-stock', authenticateToken, productController.getLowStockAlertLink);
-router.get('/barcode/:barcode', authenticateToken, productController.getProductByBarcode);
 router.get('/:id/cost-history', authenticateToken, productController.getCostHistory);
 router.get('/:id', authenticateToken, productController.getProductById);
 router.post('/', authenticateToken, productController.createProduct);

@@ -15,7 +15,11 @@ export default function SettingsPage() {
     owner_whatsapp: '',
     logo_url: '',
     invoice_footer_note: '',
-    logo_base64: ''
+    logo_base64: '',
+    bank_name: '',
+    bank_branch: '',
+    bank_account_number: '',
+    bank_ifsc: ''
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -40,7 +44,11 @@ export default function SettingsPage() {
           owner_whatsapp: res.settings.owner_whatsapp || '',
           logo_url: res.settings.logo_url || '',
           invoice_footer_note: res.settings.invoice_footer_note || '',
-          logo_base64: res.settings.logo_base64 || ''
+          logo_base64: res.settings.logo_base64 || '',
+          bank_name: res.settings.bank_name || '',
+          bank_branch: res.settings.bank_branch || '',
+          bank_account_number: res.settings.bank_account_number || '',
+          bank_ifsc: res.settings.bank_ifsc || ''
         });
       }
     } catch (err) {
@@ -256,6 +264,44 @@ export default function SettingsPage() {
                 placeholder="e.g. Main Market Road, Commercial Complex, Ahmedabad, GJ 380015"
               />
             </div>
+          </div>
+
+          <hr className="border-slate-200 dark:border-[#2D3138]" />
+
+          {/* Bank Details for NEFT/RTGS */}
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-[#F1F1F1] mb-3">
+              Bank Details for NEFT/RTGS (optional)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Bank Name"
+                value={formData.bank_name}
+                onChange={(e) => handleInputChange('bank_name', e.target.value)}
+                placeholder="e.g. HDFC Bank"
+              />
+              <Input
+                label="Branch"
+                value={formData.bank_branch}
+                onChange={(e) => handleInputChange('bank_branch', e.target.value)}
+                placeholder="e.g. Vapi Main"
+              />
+              <Input
+                label="Account Number"
+                value={formData.bank_account_number}
+                onChange={(e) => handleInputChange('bank_account_number', e.target.value)}
+                placeholder="Account number"
+              />
+              <Input
+                label="IFSC Code"
+                value={formData.bank_ifsc}
+                onChange={(e) => handleInputChange('bank_ifsc', e.target.value.toUpperCase())}
+                placeholder="e.g. HDFC0001234"
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF] mt-2">
+              Shown on invoice PDFs only when at least one field is filled.
+            </p>
           </div>
 
           <hr className="border-slate-200 dark:border-[#2D3138]" />

@@ -142,7 +142,7 @@ export default function ReportsPage() {
     } else if (reportType === 'inventory') {
       return [
         { header: 'Product Name', accessor: 'name' },
-        { header: 'Barcode', accessor: 'barcode' },
+        { header: 'HSN Code', accessor: 'hsn_code' },
         { header: 'SKU', accessor: 'sku' },
         { header: 'Stock Qty', render: (row) => <span className="font-bold">{row.stock_quantity}</span> },
         { header: 'Cost Valuation', render: (row) => formatCurrency(row.cost_value) },
@@ -151,7 +151,14 @@ export default function ReportsPage() {
     } else if (reportType === 'reconciliation') {
       return [
         { header: 'Product Name', accessor: 'name' },
-        { header: 'SKU / Barcode', render: (row) => <span className="font-mono text-xs">{row.sku}</span> },
+        {
+          header: 'SKU / HSN',
+          render: (row) => (
+            <span className="font-mono text-xs">
+              {row.sku}{row.hsn_code ? ` / ${row.hsn_code}` : ''}
+            </span>
+          )
+        },
         { header: 'Purchased (+)', accessor: 'total_purchased' },
         { header: 'Returned (+)', accessor: 'total_returned' },
         { header: 'Manual Adj (±)', accessor: 'manual_adjustments' },

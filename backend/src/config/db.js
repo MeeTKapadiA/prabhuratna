@@ -310,6 +310,7 @@ function initDb() {
 
   // Product enhancements (units, HSN, variants, stock buckets)
   runMigration(`ALTER TABLE products ADD COLUMN hsn_sac TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE products ADD COLUMN hsn_code TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE products ADD COLUMN unit TEXT DEFAULT 'pcs'`);
   runMigration(`ALTER TABLE products ADD COLUMN size_variant TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE products ADD COLUMN gauge TEXT DEFAULT ''`);
@@ -317,9 +318,20 @@ function initDb() {
   runMigration(`ALTER TABLE products ADD COLUMN display_stock REAL DEFAULT 0`);
   runMigration(`ALTER TABLE products ADD COLUMN scrap_stock REAL DEFAULT 0`);
 
+  // Backfill hsn_code from legacy hsn_sac when empty
+  try {
+    db.prepare(`
+      UPDATE products
+      SET hsn_code = hsn_sac
+      WHERE (hsn_code IS NULL OR hsn_code = '')
+        AND hsn_sac IS NOT NULL AND hsn_sac != ''
+    `).run();
+  } catch (_) { /* ignore on fresh DBs */ }
+
   // Invoice GST / AR fields
   runMigration(`ALTER TABLE invoices ADD COLUMN customer_id INTEGER`);
   runMigration(`ALTER TABLE invoices ADD COLUMN customer_gstin TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN customer_pan TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE invoices ADD COLUMN customer_address TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE invoices ADD COLUMN place_of_supply TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE invoices ADD COLUMN tax_type TEXT DEFAULT 'CGST_SGST'`);
@@ -345,6 +357,10 @@ function initDb() {
   runMigration(`ALTER TABLE invoice_items ADD COLUMN is_custom INTEGER DEFAULT 0`);
   runMigration(`ALTER TABLE invoice_items ADD COLUMN size_variant TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE invoice_items ADD COLUMN gauge TEXT DEFAULT ''`);
+
+  runMigration(`ALTER TABLE quotations ADD COLUMN customer_gstin TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE quotations ADD COLUMN customer_pan TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE quotation_items ADD COLUMN hsn_sac TEXT DEFAULT ''`);
 
   runMigration(`ALTER TABLE returns ADD COLUMN credit_note_id INTEGER`);
   runMigration(`ALTER TABLE inventory_logs ADD COLUMN user_id INTEGER`);

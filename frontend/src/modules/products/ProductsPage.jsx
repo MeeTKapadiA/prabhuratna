@@ -6,11 +6,10 @@ import Modal from '../../components/ui/Modal';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
-import BarcodeGenerator from '../../components/ui/BarcodeGenerator';
 import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
 import { formatCurrency, formatDate } from '../../services/calcService';
-import { Plus, Edit2, Trash2, Package, ScanBarcode, RefreshCw, QrCode, Globe, Eye, EyeOff, Upload, X, Image as ImageIcon, Tag } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, Globe, Eye, EyeOff, Upload, X, Image as ImageIcon, Tag } from 'lucide-react';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -30,14 +29,10 @@ export default function ProductsPage() {
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
 
-  // Barcode Viewer Modal State
-  const [selectedBarcodeProd, setSelectedBarcodeProd] = useState(null);
-  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
-
   // Form State
   const [formData, setFormData] = useState({
     name: '',
-    barcode: '',
+    hsn_code: '',
     sku: '',
     category: 'Cookware',
     brand: 'Prabhuratna',
@@ -49,7 +44,6 @@ export default function ProductsPage() {
     min_stock_level: '5',
     image_url: '',
     show_on_website: false,
-    hsn_sac: '',
     unit: 'pcs',
     size_variant: '',
     gauge: '',
@@ -149,7 +143,7 @@ export default function ProductsPage() {
     setIsCustomCategory(false);
     setFormData({
       name: '',
-      barcode: `890${Date.now().toString().slice(-9)}`,
+      hsn_code: '',
       sku: `SKU-${Date.now().toString().slice(-6)}`,
       category: 'Cookware',
       brand: 'Prabhuratna',
@@ -160,7 +154,13 @@ export default function ProductsPage() {
       stock_quantity: '10',
       min_stock_level: '5',
       image_url: '',
-      show_on_website: false
+      show_on_website: false,
+      unit: 'pcs',
+      size_variant: '',
+      gauge: '',
+      damaged_stock: '0',
+      display_stock: '0',
+      scrap_stock: '0'
     });
     setIsModalOpen(true);
   };
@@ -173,7 +173,7 @@ export default function ProductsPage() {
 
     setFormData({
       name: prod.name,
-      barcode: prod.barcode || '',
+      hsn_code: prod.hsn_code || prod.hsn_sac || '',
       sku: prod.sku || '',
       category: prod.category || 'General',
       brand: prod.brand || 'Generic',
@@ -184,7 +184,13 @@ export default function ProductsPage() {
       stock_quantity: prod.stock_quantity,
       min_stock_level: prod.min_stock_level,
       image_url: prod.image_url || '',
-      show_on_website: prod.show_on_website === 1
+      show_on_website: prod.show_on_website === 1,
+      unit: prod.unit || 'pcs',
+      size_variant: prod.size_variant || '',
+      gauge: prod.gauge || '',
+      damaged_stock: prod.damaged_stock ?? '0',
+      display_stock: prod.display_stock ?? '0',
+      scrap_stock: prod.scrap_stock ?? '0'
     });
     setIsModalOpen(true);
   };
@@ -207,13 +213,17 @@ export default function ProductsPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      hsn_sac: formData.hsn_code || '',
+    };
     try {
       if (editingId) {
-        await apiRequest(`/products/${editingId}`, 'PUT', formData);
+        await apiRequest(`/products/${editingId}`, 'PUT', payload);
         setToast({ isOpen: true, type: 'success', message: 'Product updated successfully' });
       } else {
-        await apiRequest('/products', 'POST', formData);
-        setToast({ isOpen: true, type: 'success', message: 'Product created with generated barcode' });
+        await apiRequest('/products', 'POST', payload);
+        setToast({ isOpen: true, type: 'success', message: 'Product created' });
       }
       setIsModalOpen(false);
       fetchProducts();
@@ -253,14 +263,6 @@ export default function ProductsPage() {
       render: (row) => (
         <TableActionsMenu
           actions={[
-            {
-              label: 'View Code (QR / Barcode)',
-              icon: QrCode,
-              onClick: () => {
-                setSelectedBarcodeProd(row);
-                setIsBarcodeModalOpen(true);
-              }
-            },
             {
               label: 'Edit Product',
               icon: Edit2,
@@ -310,22 +312,12 @@ export default function ProductsPage() {
       )
     },
     {
-      header: 'Barcode & QR Code',
+      header: 'HSN Code / SKU',
       accessor: 'sku',
       render: (row) => (
-        <div className="flex flex-col items-start gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedBarcodeProd(row);
-              setIsBarcodeModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] text-xs font-bold text-slate-700 dark:text-[#F1F1F1] hover:bg-slate-200 dark:hover:bg-[#2D3138] transition-all cursor-pointer shadow-xs active:scale-95"
-          >
-            <QrCode className="w-3.5 h-3.5 text-[#C0392B] dark:text-[#E74C3C]" />
-            <span>View Code</span>
-          </button>
-          <span className="font-mono text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {row.sku} {row.barcode && `| Barcode: ${row.barcode}`}</span>
+        <div className="flex flex-col items-start gap-0.5 font-mono text-[11px] text-slate-500 dark:text-[#9CA3AF]">
+          <span>SKU: {row.sku || '—'}</span>
+          <span>HSN: {row.hsn_code || row.hsn_sac || '—'}</span>
         </div>
       )
     },
@@ -386,9 +378,9 @@ export default function ProductsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Package className="w-5 h-5 text-sky-500" /> Product Inventory & Barcode Catalog
+            <Package className="w-5 h-5 text-sky-500" /> Product Inventory & Catalog
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage products, visual barcodes, pricing, stock levels, and front website selection</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage products, HSN codes, pricing, stock levels, and front website selection</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -408,7 +400,7 @@ export default function ProductsPage() {
             value={search}
             onChange={setSearch}
             onClear={() => setSearch('')}
-            placeholder="Filter by barcode, name, category, or SKU..."
+            placeholder="Filter by name, HSN, category, or SKU..."
           />
         </div>
 
@@ -517,36 +509,12 @@ export default function ProductsPage() {
         </div>
       </Modal>
 
-      {/* Barcode Viewer & Download Modal */}
-      <Modal
-        isOpen={isBarcodeModalOpen}
-        onClose={() => setIsBarcodeModalOpen(false)}
-        title={`Barcode Label: ${selectedBarcodeProd?.name}`}
-        subtitle={`Barcode: ${selectedBarcodeProd?.barcode} | SKU: ${selectedBarcodeProd?.sku}`}
-        maxWidth="max-w-md"
-      >
-        {selectedBarcodeProd && (
-          <div className="space-y-4 py-2 text-center">
-            <BarcodeGenerator
-              value={selectedBarcodeProd.barcode}
-              productName={selectedBarcodeProd.name}
-              price={selectedBarcodeProd.selling_price}
-              sku={selectedBarcodeProd.sku}
-              width={2}
-              height={60}
-              displayValue={true}
-              showActions={true}
-            />
-          </div>
-        )}
-      </Modal>
-
       {/* Add / Edit Product Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingId ? 'Edit Product' : 'Add New Product'}
-        subtitle={editingId ? 'Modify product details and inventory' : 'Create new product with auto-generated barcode'}
+        subtitle={editingId ? 'Modify product details and inventory' : 'Create a new product entry'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
@@ -565,28 +533,13 @@ export default function ProductsPage() {
               placeholder="e.g. SKU-KADAI-3L"
               required
             />
-            <div className="space-y-1">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                1D Barcode Number
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={formData.barcode}
-                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                  placeholder="e.g. 890123456789"
-                  className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, barcode: `890${Date.now().toString().slice(-9)}` })}
-                  className="px-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 text-xs flex items-center gap-1"
-                  title="Generate New Barcode"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
+            <Input
+              label="HSN Code"
+              value={formData.hsn_code}
+              onChange={(e) => setFormData({ ...formData, hsn_code: e.target.value.replace(/\D/g, '').slice(0, 8) })}
+              placeholder="e.g. 7323"
+              maxLength={8}
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -663,12 +616,6 @@ export default function ProductsPage() {
               value={formData.gst_percent}
               onChange={(e) => setFormData({ ...formData, gst_percent: e.target.value })}
               placeholder="18"
-            />
-            <Input
-              label="HSN / SAC"
-              value={formData.hsn_sac || ''}
-              onChange={(e) => setFormData({ ...formData, hsn_sac: e.target.value })}
-              placeholder="e.g. 7323"
             />
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF] mb-1">Unit</label>

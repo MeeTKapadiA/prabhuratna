@@ -36,7 +36,7 @@ exports.getDashboardStats = (req, res) => {
     const outOfStockProducts = db.prepare('SELECT COUNT(*) as count FROM products WHERE is_active = 1 AND stock_quantity <= 0').get().count;
 
     const lowStockList = db.prepare(`
-      SELECT id, name, sku, barcode, stock_quantity, min_stock_level
+      SELECT id, name, sku, COALESCE(hsn_code, hsn_sac, '') as hsn_code, stock_quantity, min_stock_level
       FROM products
       WHERE is_active = 1 AND stock_quantity <= min_stock_level AND stock_quantity > 0
       ORDER BY stock_quantity ASC
@@ -44,7 +44,7 @@ exports.getDashboardStats = (req, res) => {
     `).all();
 
     const outOfStockList = db.prepare(`
-      SELECT id, name, sku, barcode, stock_quantity, min_stock_level
+      SELECT id, name, sku, COALESCE(hsn_code, hsn_sac, '') as hsn_code, stock_quantity, min_stock_level
       FROM products
       WHERE is_active = 1 AND stock_quantity <= 0
       ORDER BY stock_quantity ASC

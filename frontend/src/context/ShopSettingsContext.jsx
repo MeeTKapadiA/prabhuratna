@@ -19,7 +19,11 @@ const PUBLIC_KEYS = [
   'shop_gstin',
   'logo_base64',
   'logo_url',
-  'invoice_footer_note'
+  'invoice_footer_note',
+  'bank_name',
+  'bank_branch',
+  'bank_account_number',
+  'bank_ifsc'
 ];
 
 export function getShopLogoSrc(settings = {}) {

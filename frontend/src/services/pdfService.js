@@ -15,7 +15,6 @@ function resolveLogoFormat(logoSrc = '') {
 }
 
 function drawShopLogo(doc, settings = {}) {
-  // Uploaded base64 from Business Settings is the reliable PDF source
   const logoSrc = settings.logo_base64 || '';
   if (!logoSrc) return false;
   try {
@@ -25,6 +24,58 @@ function drawShopLogo(doc, settings = {}) {
     console.error('Failed to render logo in PDF:', e);
     return false;
   }
+}
+
+/** Invoice numbers like INV/2026-27/0001 break browser downloads — replace / and other unsafe chars. */
+export function sanitizePdfFilename(name, fallback = 'document') {
+  const cleaned = String(name || fallback)
+    .replace(/[\/\\?%*:|"<>]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return cleaned || fallback;
+}
+
+function itemHsn(item = {}) {
+  return item.hsn_sac || item.hsn_code || '–';
+}
+
+function hasBankDetails(settings = {}) {
+  return Boolean(
+    settings.bank_name ||
+    settings.bank_branch ||
+    settings.bank_account_number ||
+    settings.bank_ifsc
+  );
+}
+
+function drawBankDetails(doc, settings, startY) {
+  if (!hasBankDetails(settings)) return startY;
+
+  let y = startY;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Bank Details for NEFT/RTGS', 14, y);
+  y += 4;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  if (settings.bank_name) {
+    doc.text(`Bank: ${settings.bank_name}`, 14, y);
+    y += 3.5;
+  }
+  if (settings.bank_branch) {
+    doc.text(`Branch: ${settings.bank_branch}`, 14, y);
+    y += 3.5;
+  }
+  if (settings.bank_account_number) {
+    doc.text(`A/C No: ${settings.bank_account_number}`, 14, y);
+    y += 3.5;
+  }
+  if (settings.bank_ifsc) {
+    doc.text(`IFSC: ${settings.bank_ifsc}`, 14, y);
+    y += 3.5;
+  }
+  return y + 2;
 }
 
 /**
@@ -45,7 +96,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   const settings = options.settings || invoice.settings || {};
   const shopName = settings.shop_name || 'Prabhuratna Metals Pvt. Ltd.';
   const shopAddress = settings.shop_address || 'Main Market Road, Commercial Complex, Ahmedabad, GJ';
-  const shopGstin = settings.shop_gstin || '24ABCDE1234F1Z5';
+  const shopGstin = settings.shop_gstin || 'N/A';
   const shopPhone = settings.shop_phone || '+91 98765 43210';
   const shopEmail = settings.shop_email || 'info@prabhuratna.com';
   const footerNote = settings.invoice_footer_note || 'Thank you for shopping with us! Visit again.';
@@ -75,7 +126,6 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(9);
 
-  // Left: Store Address
   doc.setFont('helvetica', 'bold');
   doc.text(shopName, 14, 36);
   doc.setFont('helvetica', 'normal');
@@ -83,7 +133,6 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text(`GSTIN: ${shopGstin} | Ph: ${shopPhone}`, 14, 46);
   doc.text(`Email: ${shopEmail}`, 14, 51);
 
-  // Right: Invoice Metadata (Two-Column Alignment)
   const metaLabelX = 150;
   const metaValueX = 196;
 
@@ -98,16 +147,29 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text('Payment Mode:', metaLabelX, 46);
   doc.text(invoice.payment_mode || 'Cash', metaValueX, 46, { align: 'right' });
 
-  // 3. Customer Info Box
+  // 3. Customer Info Box (GSTIN / PAN only when filled)
+  const customerGstin = (invoice.customer_gstin || '').trim();
+  const customerPan = (invoice.customer_pan || '').trim();
+  const billedLines = [
+    `Customer: ${invoice.customer_name || 'Walk-in Customer'}`,
+    `Phone: ${invoice.customer_phone || 'N/A'}`
+  ];
+  if (customerGstin) billedLines.push(`GSTIN: ${customerGstin}`);
+  if (customerPan) billedLines.push(`PAN: ${customerPan}`);
+
+  const boxHeight = 14 + billedLines.length * 5;
   doc.setDrawColor(226, 232, 240);
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(14, 57, 182, 22, 2, 2, 'FD');
+  doc.roundedRect(14, 57, 182, boxHeight, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.text('Billed To:', 18, 64);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Customer: ${invoice.customer_name || 'Walk-in Customer'}`, 18, 70);
-  doc.text(`Phone: ${invoice.customer_phone || 'N/A'}  |  GSTIN: ${invoice.customer_gstin || 'N/A'}`, 18, 75);
+  billedLines.forEach((line, i) => {
+    doc.text(line, 18, 70 + i * 5);
+  });
+
+  const tableStartY = 57 + boxHeight + 6;
 
   // 4. Items Table
   const tableData = (invoice.items || []).map((item, idx) => {
@@ -117,7 +179,7 @@ export function generateInvoicePDF(invoice, options = {}) {
     return [
       idx + 1,
       item.product_name || 'N/A',
-      item.hsn_sac || item.barcode || '–',
+      itemHsn(item),
       formatCurrencyPDF(item.unit_price),
       `${item.quantity || 1}${item.unit ? ` ${item.unit}` : ''}`,
       discVal > 0 ? `${discVal}%` : '–',
@@ -127,7 +189,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   });
 
   doc.autoTable({
-    startY: 85,
+    startY: tableStartY,
     margin: { left: 14, right: 14 },
     head: [['#', 'Description', 'HSN', 'Rate', 'Qty', 'Disc', 'GST', 'Amount']],
     body: tableData,
@@ -208,15 +270,18 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.setFont('helvetica', 'normal');
   doc.text('Authorized Signatory', 196, footerY + 16, { align: 'right' });
 
+  let afterTermsY = footerY + 22;
+  afterTermsY = drawBankDetails(doc, settings, afterTermsY);
+
   if (footerNote) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(footerNote, 105, footerY + 24, { align: 'center' });
+    doc.text(footerNote, 105, afterTermsY + 4, { align: 'center' });
   }
 
   if (options.save !== false) {
-    doc.save(`${invoice.invoice_number}.pdf`);
+    doc.save(`${sanitizePdfFilename(invoice.invoice_number, 'invoice')}.pdf`);
   }
 
   return doc;
@@ -235,7 +300,7 @@ export function generateQuotationPDF(quotation, options = {}) {
   const settings = options.settings || quotation.settings || {};
   const shopName = settings.shop_name || 'Prabhuratna Metals Pvt. Ltd.';
   const shopAddress = settings.shop_address || 'Main Market Road, Commercial Complex, Ahmedabad, GJ';
-  const shopGstin = settings.shop_gstin || '24ABCDE1234F1Z5';
+  const shopGstin = settings.shop_gstin || 'N/A';
   const shopPhone = settings.shop_phone || '+91 98765 43210';
   const shopEmail = settings.shop_email || 'info@prabhuratna.com';
   const footerNote = settings.invoice_footer_note || 'Thank you for shopping with us! Visit again.';
@@ -246,7 +311,6 @@ export function generateQuotationPDF(quotation, options = {}) {
     format: 'a4'
   });
 
-  // 1. Header
   doc.setFillColor(...BRAND_COLOR);
   doc.rect(0, 0, 210, 28, 'F');
 
@@ -261,7 +325,6 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFont('helvetica', 'normal');
   doc.text('COMMERCIAL QUOTATION', 196, 16, { align: 'right' });
 
-  // 2. Company Info & Quotation Details
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(9);
 
@@ -272,7 +335,6 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text(`GSTIN: ${shopGstin} | Ph: ${shopPhone}`, 14, 46);
   doc.text(`Email: ${shopEmail}`, 14, 51);
 
-  // Right: Quotation Metadata (Two-Column Alignment)
   const metaLabelX = 150;
   const metaValueX = 196;
 
@@ -288,18 +350,29 @@ export function generateQuotationPDF(quotation, options = {}) {
     doc.text(new Date(quotation.valid_until).toLocaleDateString('en-IN'), metaValueX, 46, { align: 'right' });
   }
 
-  // 3. Customer Information Box
+  const customerGstin = (quotation.customer_gstin || '').trim();
+  const customerPan = (quotation.customer_pan || '').trim();
+  const quoteLines = [
+    `Company / Client: ${quotation.customer_name}`,
+    `Phone: ${quotation.customer_phone || 'N/A'}  |  Email: ${quotation.customer_email || 'N/A'}`
+  ];
+  if (customerGstin) quoteLines.push(`GSTIN: ${customerGstin}`);
+  if (customerPan) quoteLines.push(`PAN: ${customerPan}`);
+
+  const boxHeight = 14 + quoteLines.length * 5;
   doc.setDrawColor(226, 232, 240);
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(14, 53, 182, 24, 2, 2, 'FD');
+  doc.roundedRect(14, 53, 182, boxHeight, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.text('Quotation Prepared For:', 18, 60);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Company / Client: ${quotation.customer_name}`, 18, 66);
-  doc.text(`Phone: ${quotation.customer_phone || 'N/A'}  |  Email: ${quotation.customer_email || 'N/A'}`, 18, 71);
+  quoteLines.forEach((line, i) => {
+    doc.text(line, 18, 66 + i * 5);
+  });
 
-  // 4. Quotation Items Table
+  const tableStartY = 53 + boxHeight + 6;
+
   const tableData = (quotation.items || []).map((item, idx) => {
     const discVal = parseFloat(item.discount_percent);
     const gstVal = parseFloat(item.gst_percent);
@@ -307,6 +380,7 @@ export function generateQuotationPDF(quotation, options = {}) {
     return [
       idx + 1,
       item.product_name || 'N/A',
+      itemHsn(item),
       formatCurrencyPDF(item.unit_price),
       item.quantity || 1,
       discVal > 0 ? `${discVal}%` : '–',
@@ -316,9 +390,9 @@ export function generateQuotationPDF(quotation, options = {}) {
   });
 
   doc.autoTable({
-    startY: 83,
+    startY: tableStartY,
     margin: { left: 14, right: 14 },
-    head: [['#', 'Product Description', 'Rate', 'Qty', 'Disc %', 'GST %', 'Total Amount']],
+    head: [['#', 'Product Description', 'HSN', 'Rate', 'Qty', 'Disc %', 'GST %', 'Total Amount']],
     body: tableData,
     headStyles: {
       fillColor: BRAND_COLOR,
@@ -329,11 +403,12 @@ export function generateQuotationPDF(quotation, options = {}) {
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
       1: { cellWidth: 'auto', halign: 'left' },
-      2: { cellWidth: 28, halign: 'right' },
-      3: { cellWidth: 16, halign: 'center' },
-      4: { cellWidth: 18, halign: 'right' },
-      5: { cellWidth: 18, halign: 'right' },
-      6: { cellWidth: 32, halign: 'right' }
+      2: { cellWidth: 22, halign: 'center' },
+      3: { cellWidth: 26, halign: 'right' },
+      4: { cellWidth: 14, halign: 'center' },
+      5: { cellWidth: 16, halign: 'right' },
+      6: { cellWidth: 16, halign: 'right' },
+      7: { cellWidth: 28, halign: 'right' }
     },
     styles: {
       fontSize: 8,
@@ -343,7 +418,6 @@ export function generateQuotationPDF(quotation, options = {}) {
     alternateRowStyles: { fillColor: [248, 250, 252] }
   });
 
-  // 5. Totals Section
   const finalY = doc.lastAutoTable.finalY + 8;
   const rightX = 196;
   const labelX = 135;
@@ -365,7 +439,6 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.text('Quotation Total:', labelX, finalY + 15);
   doc.text(formatCurrencyPDF(quotation.grand_total), rightX, finalY + 15, { align: 'right' });
 
-  // 6. Notes, Terms & Signature Area
   const footerY = finalY + 24;
 
   if (quotation.notes) {
@@ -386,15 +459,18 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setFont('helvetica', 'normal');
   doc.text('Authorized Commercial Representative', 196, footerY + 20, { align: 'right' });
 
+  let afterTermsY = footerY + 24;
+  afterTermsY = drawBankDetails(doc, settings, afterTermsY);
+
   if (footerNote) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(footerNote, 105, footerY + 24, { align: 'center' });
+    doc.text(footerNote, 105, afterTermsY + 4, { align: 'center' });
   }
 
   if (options.save !== false) {
-    doc.save(`${quotation.quotation_number}.pdf`);
+    doc.save(`${sanitizePdfFilename(quotation.quotation_number, 'quotation')}.pdf`);
   }
 
   return doc;

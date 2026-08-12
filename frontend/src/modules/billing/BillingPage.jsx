@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import SearchBar from '../../components/ui/SearchBar';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
-import { setupBarcodeScanner } from '../../services/barcodeScanner';
 import { calculateCartTotals, formatCurrency } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
 import { useShopSettings } from '../../context/ShopSettingsContext';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
 import {
-  ScanBarcode,
   Search,
   Plus,
   Minus,
@@ -22,19 +19,17 @@ import {
   CreditCard,
   QrCode,
   DollarSign,
-  Camera,
-  ShoppingBag
+  ShoppingBag,
+  Landmark,
+  Building2
 } from 'lucide-react';
-import BarcodeCameraScannerModal from '../../components/ui/BarcodeCameraScannerModal';
 import { enqueueInvoice, flushQueue, getQueue, isOnline } from '../../services/offlineQueue';
 
 export default function BillingPage() {
   const { settings: shopSettings, refreshSettings } = useShopSettings();
   const [cartItems, setCartItems] = useState([]);
-  const [manualSearch, setManualSearch] = useState('');
+  const [catalogSearch, setCatalogSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
   const [isCustomItemOpen, setIsCustomItemOpen] = useState(false);
   const [customItem, setCustomItem] = useState({
     product_name: '', unit_price: '', quantity: 1, gst_percent: 18, hsn_sac: '', unit: 'pcs'
@@ -45,8 +40,9 @@ export default function BillingPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
+  const [customerPan, setCustomerPan] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  const [paymentMode, setPaymentMode] = useState('CASH'); // CASH, UPI, CARD, MIXED, CREDIT
+  const [paymentMode, setPaymentMode] = useState('CASH');
   const [amountPaid, setAmountPaid] = useState('');
   const [overallDiscount, setOverallDiscount] = useState(0);
   const [scrapValue, setScrapValue] = useState(0);
@@ -98,70 +94,11 @@ export default function BillingPage() {
     setToast({ isOpen: true, type, message });
   };
 
-  // Hardware Barcode Gun Listener - Instant Auto Add
   useEffect(() => {
-    const cleanup = setupBarcodeScanner((scannedBarcode) => {
-      handleSmartScan(scannedBarcode);
-    });
-    return cleanup;
-  }, [cartItems]);
-
-  // Smart QR & Barcode Auto-Add Handler
-  const handleSmartScan = async (scannedText) => {
-    if (!scannedText) return false;
-    let targetCode = String(scannedText).trim();
-
-    // 1. Parse JSON Smart QR payload (e.g. {"barcode": "...", "sku": "...", "id": 12})
-    try {
-      if (targetCode.startsWith('{') && targetCode.endsWith('}')) {
-        const parsed = JSON.parse(targetCode);
-        if (parsed.barcode) targetCode = String(parsed.barcode);
-        else if (parsed.sku) targetCode = String(parsed.sku);
-        else if (parsed.id || parsed.product_id) targetCode = String(parsed.id || parsed.product_id);
-      }
-    } catch (e) {}
-
-    // 2. Clean URL or prefixes if present (e.g. http://.../products/890745951663 or PROD:890745951663)
-    if (targetCode.includes('http://') || targetCode.includes('https://')) {
-      const parts = targetCode.split('/');
-      targetCode = parts[parts.length - 1] || targetCode;
-    }
-    targetCode = targetCode.replace(/^(BARCODE|SKU|PROD|ITEM):/i, '');
-
-    // 3. Direct lookup by Barcode
-    try {
-      const res = await apiRequest(`/products/barcode/${encodeURIComponent(targetCode)}`);
-      if (res.success && res.product) {
-        addToCart(res.product);
-        showToast(`⚡ Scanned: ${res.product.name} auto-added to cart!`, 'success');
-        return true;
-      }
-    } catch (err) {}
-
-    // 4. Fallback search by SKU or Product Search
-    try {
-      const res = await apiRequest(`/products?search=${encodeURIComponent(targetCode)}&activeOnly=true`);
-      if (res.success && res.products && res.products.length > 0) {
-        const match = res.products.find(
-          (p) => String(p.sku) === targetCode || String(p.barcode) === targetCode || String(p.id) === targetCode
-        ) || res.products[0];
-
-        addToCart(match);
-        showToast(`⚡ Scanned: ${match.name} auto-added to cart!`, 'success');
-        return true;
-      }
-    } catch (err) {}
-
-    showToast(`Product not found for scanned code: "${targetCode}"`, 'error');
-    return false;
-  };
-
-  // Search Products for Manual Add
-  useEffect(() => {
-    if (manualSearch.trim().length > 1) {
+    if (catalogSearch.trim().length > 1) {
       const timer = setTimeout(async () => {
         try {
-          const res = await apiRequest(`/products?search=${encodeURIComponent(manualSearch)}&activeOnly=true`);
+          const res = await apiRequest(`/products?search=${encodeURIComponent(catalogSearch)}&activeOnly=true`);
           if (res.success) {
             setSearchResults(res.products);
           }
@@ -173,7 +110,14 @@ export default function BillingPage() {
     } else {
       setSearchResults([]);
     }
-  }, [manualSearch]);
+  }, [catalogSearch]);
+
+  const selectCatalogProduct = (prod) => {
+    addToCart(prod);
+    setCatalogSearch('');
+    setSearchResults([]);
+    showToast(`Added ${prod.name} to cart!`, 'success');
+  };
 
   const addToCart = (product) => {
     setCartItems((prev) => {
@@ -197,9 +141,9 @@ export default function BillingPage() {
           {
             product_id: product.id,
             product_name: product.name,
-            barcode: product.barcode,
+            barcode: '',
             sku: product.sku,
-            hsn_sac: product.hsn_sac || '',
+            hsn_sac: product.hsn_code || product.hsn_sac || '',
             unit: product.unit || 'pcs',
             size_variant: product.size_variant || '',
             gauge: product.gauge || '',
@@ -283,7 +227,7 @@ export default function BillingPage() {
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
-      showToast('Cart is empty. Scan items or search to add.', 'error');
+      showToast('Cart is empty. Search catalog to add items.', 'error');
       return;
     }
 
@@ -303,6 +247,7 @@ export default function BillingPage() {
         customer_phone: customerPhone,
         customer_email: customerEmail,
         customer_gstin: customerGstin,
+        customer_pan: customerPan,
         customer_address: customerAddress,
         payment_mode: paymentMode,
         amount_paid: paid,
@@ -343,6 +288,7 @@ export default function BillingPage() {
         setCustomerPhone('');
         setCustomerEmail('');
         setCustomerGstin('');
+        setCustomerPan('');
         setCustomerAddress('');
         setOverallDiscount(0);
         setScrapValue(0);
@@ -363,6 +309,7 @@ export default function BillingPage() {
           customer_phone: customerPhone,
           customer_email: customerEmail,
           customer_gstin: customerGstin,
+          customer_pan: customerPan,
           customer_address: customerAddress,
           payment_mode: paymentMode,
           amount_paid: paymentMode === 'CREDIT' ? 0 : displayGrand,
@@ -396,6 +343,9 @@ export default function BillingPage() {
     }
   };
 
+  const pdfSettings = Object.keys(shopSettings || {}).length ? shopSettings : settings;
+  const showCatalogDropdown = catalogSearch.trim().length > 1 && searchResults.length > 0;
+
   return (
     <div className="p-2 sm:p-4 space-y-6 max-w-7xl mx-auto">
       {/* Top Action Bar */}
@@ -405,7 +355,7 @@ export default function BillingPage() {
             <ShoppingBag className="w-5 h-5 text-[#C0392B] dark:text-[#E74C3C]" /> Express POS Counter Billing
           </h2>
           <p className="text-xs text-slate-500 dark:text-[#9CA3AF] mt-0.5">
-            Scan barcode first · Enter adds item · F2 checkout · Custom item if not in catalog
+            Search catalog · F2 checkout · Custom item if not in catalog
             {offlineCount > 0 ? ` · ${offlineCount} offline queued` : ''}
           </p>
           {apiDown && (
@@ -416,39 +366,55 @@ export default function BillingPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setIsCameraScannerOpen(true)} variant="secondary" icon={Camera}>
-            Camera
-          </Button>
           <Button onClick={() => setIsCustomItemOpen(true)} variant="secondary" icon={Plus}>
             Custom Item
-          </Button>
-          <Button onClick={() => setIsSearchModalOpen(true)} variant="primary" icon={Search}>
-            Search
           </Button>
         </div>
       </div>
 
       {/* Main Billing Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Col: Cart Table & Barcode Input */}
+        {/* Left Col: Cart Table & Catalog Search */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Barcode Gun Input Field */}
+          {/* Live Catalog Search */}
           <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-sm">
             <div className="relative">
-              <ScanBarcode className="absolute left-3.5 top-3 w-5 h-5 text-[#C0392B] dark:text-[#E74C3C] animate-pulse" />
+              <Search className="absolute left-3.5 top-3 w-5 h-5 text-slate-400 dark:text-slate-500" />
               <input
-                id="barcode-scanner-input"
                 type="text"
-                placeholder="Ready for USB/Bluetooth Barcode or Smart QR Scan... (Hit Enter)"
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && e.target.value.trim()) {
-                    handleSmartScan(e.target.value.trim());
-                    e.target.value = '';
+                  if (e.key === 'Enter' && searchResults.length === 1) {
+                    selectCatalogProduct(searchResults[0]);
                   }
                 }}
-                className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-sm font-mono text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C]"
+                placeholder="Search products by name, SKU, or HSN..."
+                className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-sm text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C]"
                 autoFocus
               />
+              {showCatalogDropdown && (
+                <div className="absolute z-20 left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] shadow-lg">
+                  {searchResults.map((prod) => (
+                    <button
+                      key={prod.id}
+                      type="button"
+                      onClick={() => selectCatalogProduct(prod)}
+                      className="w-full flex items-center justify-between p-3 text-left hover:bg-slate-50 dark:hover:bg-[#121417] border-b border-slate-100 dark:border-[#2D3138] last:border-b-0 transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1] truncate">{prod.name}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-[#9CA3AF]">
+                          SKU: {prod.sku} | HSN: {prod.hsn_code || prod.hsn_sac || '–'} | Stock: {prod.stock_quantity}
+                        </p>
+                      </div>
+                      <p className="text-xs font-extrabold text-[#C0392B] dark:text-[#E74C3C] shrink-0 ml-3">
+                        {formatCurrency(prod.selling_price)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -487,9 +453,9 @@ export default function BillingPage() {
                   {cartItems.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-16 text-center text-slate-500 dark:text-[#9CA3AF]">
-                        <ScanBarcode className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-600 animate-bounce" />
-                        <p className="font-semibold text-slate-700 dark:text-[#F1F1F1]">Scan Barcode to Add Item</p>
-                        <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Scanning automatically fills Product, SKU, Price, GST, and Disc %</p>
+                        <Search className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-600" />
+                        <p className="font-semibold text-slate-700 dark:text-[#F1F1F1]">Search catalog above to add items</p>
+                        <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Type product name, SKU, or HSN to find and add items</p>
                       </td>
                     </tr>
                   ) : (
@@ -499,7 +465,7 @@ export default function BillingPage() {
                         <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#121417]/50 transition-colors">
                           <td className="px-4 py-3 font-semibold text-slate-900 dark:text-[#F1F1F1]">
                             <div>{item.product_name}</div>
-                            <div className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">SKU: {item.sku} | Barcode: {item.barcode}</div>
+                            <div className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">SKU: {item.sku} | HSN: {item.hsn_sac || item.hsn_code || '–'}</div>
                           </td>
                           <td className="px-3 py-3 font-semibold text-slate-900 dark:text-[#F1F1F1]">
                             {formatCurrency(item.unit_price)}
@@ -562,9 +528,9 @@ export default function BillingPage() {
               <div className="block md:hidden divide-y divide-slate-200 dark:divide-[#2D3138]">
                 {cartItems.length === 0 ? (
                   <div className="p-8 text-center text-slate-500 dark:text-[#9CA3AF]">
-                    <ScanBarcode className="w-10 h-10 mx-auto mb-2 text-slate-400 animate-bounce" />
-                    <p className="font-bold text-slate-800 dark:text-[#F1F1F1] text-sm">Cart is Empty</p>
-                    <p className="text-xs text-slate-500 mt-1">Scan barcode or tap "Search Catalog" above</p>
+                    <Search className="w-10 h-10 mx-auto mb-2 text-slate-400" />
+                    <p className="font-bold text-slate-800 dark:text-[#F1F1F1] text-sm">Search catalog above to add items</p>
+                    <p className="text-xs text-slate-500 mt-1">Type product name, SKU, or HSN to find and add items</p>
                   </div>
                 ) : (
                   cartItems.map((item, idx) => (
@@ -572,7 +538,7 @@ export default function BillingPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <h4 className="font-bold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.product_name}</h4>
-                          <p className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">SKU: {item.sku}</p>
+                          <p className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">SKU: {item.sku} | HSN: {item.hsn_sac || item.hsn_code || '–'}</p>
                         </div>
                         <button
                           type="button"
@@ -676,6 +642,14 @@ export default function BillingPage() {
               />
 
               <Input
+                label="Customer PAN"
+                value={customerPan}
+                onChange={(e) => setCustomerPan(e.target.value.toUpperCase())}
+                placeholder="Optional 10-char PAN"
+                className="min-w-0"
+              />
+
+              <Input
                 label="Billing Address"
                 type="textarea"
                 value={customerAddress}
@@ -730,11 +704,13 @@ export default function BillingPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
                 Payment Mode
               </label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
                 {[
                   { id: 'CASH', label: 'Cash', icon: DollarSign },
                   { id: 'UPI', label: 'UPI', icon: QrCode },
                   { id: 'CARD', label: 'Card', icon: CreditCard },
+                  { id: 'NEFT', label: 'NEFT', icon: Landmark },
+                  { id: 'RTGS', label: 'RTGS', icon: Building2 },
                   { id: 'MIXED', label: 'Split', icon: Plus },
                   { id: 'CREDIT', label: 'Udhaar', icon: CreditCard }
                 ].map((mode) => {
@@ -822,63 +798,6 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Manual Search Product Modal */}
-      <Modal
-        isOpen={isSearchModalOpen}
-        onClose={() => setIsSearchModalOpen(false)}
-        title="Search Product Catalog"
-        subtitle="Search products by name, SKU or barcode to add to current bill"
-      >
-        <div className="space-y-4">
-          <SearchBar
-            value={manualSearch}
-            onChange={setManualSearch}
-            onClear={() => setManualSearch('')}
-            placeholder="Type product name, brand, SKU..."
-            autoFocus
-          />
-
-          <div className="max-h-60 overflow-y-auto space-y-2">
-            {searchResults.length === 0 ? (
-              <p className="text-xs text-center py-6 text-slate-500 dark:text-[#9CA3AF]">
-                {manualSearch ? 'No products match search query' : 'Type at least 2 characters to search'}
-              </p>
-            ) : (
-              searchResults.map((prod) => (
-                <div
-                  key={prod.id}
-                  onClick={() => {
-                    addToCart(prod);
-                    setIsSearchModalOpen(false);
-                    setManualSearch('');
-                    showToast(`Added ${prod.name} to cart!`, 'success');
-                  }}
-                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#121417] border border-slate-200 dark:border-[#2D3138] hover:border-[#C0392B] dark:hover:border-[#E74C3C] cursor-pointer transition-all"
-                >
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1]">{prod.name}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku} | Barcode: {prod.barcode} | Stock: {prod.stock_quantity}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-extrabold text-[#C0392B] dark:text-[#E74C3C]">{formatCurrency(prod.selling_price)}</p>
-                    <Badge variant={prod.stock_quantity > 0 ? 'success' : 'danger'}>
-                      {prod.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
-                    </Badge>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </Modal>
-
-      {/* Live Mobile Camera Barcode & Smart QR Scanner Modal */}
-      <BarcodeCameraScannerModal
-        isOpen={isCameraScannerOpen}
-        onClose={() => setIsCameraScannerOpen(false)}
-        onScanSuccess={(decodedText) => handleSmartScan(decodedText)}
-      />
-
       {/* Post Checkout Completed Invoice Modal */}
       <Modal
         isOpen={isInvoiceModalOpen}
@@ -889,20 +808,20 @@ export default function BillingPage() {
           <div className="flex flex-wrap gap-2 justify-end">
             <button
               type="button"
-              onClick={() => shareOnWhatsApp('invoice', completedInvoice, settings, (msg) => showToast(msg, 'info'))}
+              onClick={() => shareOnWhatsApp('invoice', completedInvoice, pdfSettings, (msg) => showToast(msg, 'info'))}
               className="bg-[#25D366] hover:bg-[#20BD5A] text-white flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
             >
               <WhatsAppIcon className="w-4 h-4" /> Share on WhatsApp
             </button>
             <Button
-              onClick={() => printInvoicePDF(completedInvoice, settings)}
+              onClick={() => printInvoicePDF(completedInvoice, pdfSettings)}
               variant="secondary"
               icon={Printer}
             >
               Print Invoice
             </Button>
             <Button
-              onClick={() => generateInvoicePDF(completedInvoice, { settings })}
+              onClick={() => generateInvoicePDF(completedInvoice, { settings: pdfSettings })}
               variant="primary"
               icon={Printer}
             >

@@ -5,7 +5,7 @@ export default function SearchBar({
   value,
   onChange,
   onClear,
-  placeholder = 'Search by barcode, name, SKU...',
+  placeholder = 'Search by name, SKU, HSN...',
   className = '',
   autoFocus = false
 }) {

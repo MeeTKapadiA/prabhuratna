@@ -106,7 +106,7 @@ export default function InventoryPage() {
       render: (row) => (
         <div>
           <p className="font-bold text-slate-900 dark:text-[#F1F1F1]">{row.name}</p>
-          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-mono">Barcode: {row.barcode} | SKU: {row.sku}</p>
+          <p className="text-xs text-slate-500 dark:text-[#9CA3AF] font-mono">HSN: {row.hsn_code || row.hsn_sac || 'N/A'} | SKU: {row.sku}</p>
         </div>
       )
     },
@@ -265,7 +265,7 @@ export default function InventoryPage() {
             value={search}
             onChange={setSearch}
             onClear={() => setSearch('')}
-            placeholder="Search stock by product name, barcode, SKU..."
+            placeholder="Search stock by product name, HSN, SKU..."
           />
 
           {/* Desktop Table View */}
@@ -285,7 +285,7 @@ export default function InventoryPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h4 className="font-extrabold text-sm text-slate-900 dark:text-[#F1F1F1]">{item.name}</h4>
-                      <p className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">Barcode: {item.barcode || 'N/A'} | SKU: {item.sku}</p>
+                      <p className="text-[10px] font-mono text-slate-500 dark:text-[#9CA3AF]">HSN: {item.hsn_code || item.hsn_sac || 'N/A'} | SKU: {item.sku}</p>
                       <p className="text-xs text-slate-600 dark:text-[#9CA3AF] mt-0.5">{item.category} / {item.brand}</p>
                     </div>
                     <TableActionsMenu

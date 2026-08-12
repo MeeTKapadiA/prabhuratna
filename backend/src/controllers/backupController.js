@@ -50,8 +50,8 @@ exports.exportCSV = (req, res) => {
     const timestamp = now.toISOString().slice(0, 10).replace(/-/g, '');
 
     if (type === 'products') {
-      data = db.prepare('SELECT id, name, barcode, sku, category, brand, purchase_price, selling_price, stock_quantity, created_at FROM products').all();
-      headers = ['ID', 'Name', 'Barcode', 'SKU', 'Category', 'Brand', 'Purchase Price', 'Selling Price', 'Stock Quantity', 'Created At'];
+      data = db.prepare('SELECT id, name, COALESCE(hsn_code, hsn_sac, \'\') as hsn_code, sku, category, brand, purchase_price, selling_price, stock_quantity, created_at FROM products').all();
+      headers = ['ID', 'Name', 'HSN Code', 'SKU', 'Category', 'Brand', 'Purchase Price', 'Selling Price', 'Stock Quantity', 'Created At'];
       fileName = `prabhuratna_products_${timestamp}.csv`;
     } else if (type === 'invoices') {
       data = db.prepare('SELECT invoice_number, customer_name, customer_phone, subtotal, tax_amount, discount_amount, grand_total, payment_mode, created_at FROM invoices').all();

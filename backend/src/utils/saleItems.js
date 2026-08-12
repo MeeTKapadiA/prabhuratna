@@ -31,6 +31,7 @@ function processSaleItems(items = []) {
       product_id: item.product_id || null,
       product_name: String(item.product_name || 'Item').slice(0, 200),
       barcode: String(item.barcode || '').slice(0, 64),
+      hsn_sac: String(item.hsn_sac || item.hsn_code || '').replace(/\D/g, '').slice(0, 8),
       unit_price: uPrice,
       quantity: qty,
       discount_percent: disc,

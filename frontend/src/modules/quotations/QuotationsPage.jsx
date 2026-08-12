@@ -29,6 +29,8 @@ export default function QuotationsPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [customerGstin, setCustomerGstin] = useState('');
+  const [customerPan, setCustomerPan] = useState('');
   const [validDays, setValidDays] = useState('15');
   const [notes, setNotes] = useState('');
 
@@ -82,6 +84,22 @@ export default function QuotationsPage() {
     }
   }, [prodSearch]);
 
+  const pdfSettings = Object.keys(shopSettings || {}).length ? shopSettings : settings;
+
+  const resetQuotationForm = () => {
+    setQtnItems([]);
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerEmail('');
+    setCustomerAddress('');
+    setCustomerGstin('');
+    setCustomerPan('');
+    setValidDays('15');
+    setNotes('');
+    setProdSearch('');
+    setSearchResults([]);
+  };
+
   const addItemToQuotation = (prod) => {
     setQtnItems((prev) => {
       const exists = prev.find((item) => item.product_id === prod.id);
@@ -95,7 +113,8 @@ export default function QuotationsPage() {
         {
           product_id: prod.id,
           product_name: prod.name,
-          barcode: prod.barcode,
+          barcode: prod.barcode || '',
+          hsn_sac: prod.hsn_code || prod.hsn_sac || '',
           unit_price: prod.selling_price,
           quantity: 1,
           discount_percent: prod.discount_percent || 0,
@@ -123,6 +142,8 @@ export default function QuotationsPage() {
         customer_phone: customerPhone,
         customer_email: customerEmail,
         customer_address: customerAddress,
+        customer_gstin: customerGstin,
+        customer_pan: customerPan,
         notes,
         valid_until: validUntil.toISOString().split('T')[0],
         items: qtnItems
@@ -132,11 +153,7 @@ export default function QuotationsPage() {
       if (res.success) {
         setToast({ isOpen: true, type: 'success', message: 'Quotation generated successfully!' });
         setIsModalOpen(false);
-        setQtnItems([]);
-        setCustomerName('');
-        setCustomerPhone('');
-        setCustomerEmail('');
-        setCustomerAddress('');
+        resetQuotationForm();
         fetchQuotations();
       }
     } catch (err) {
@@ -148,7 +165,7 @@ export default function QuotationsPage() {
     try {
       const res = await apiRequest(`/quotations/${id}`);
       if (res.success && res.quotation) {
-        generateQuotationPDF(res.quotation, { settings });
+        generateQuotationPDF(res.quotation, { settings: pdfSettings });
         setToast({ isOpen: true, type: 'success', message: 'Quotation PDF Downloaded' });
       }
     } catch (err) {
@@ -160,7 +177,7 @@ export default function QuotationsPage() {
     try {
       const res = await apiRequest(`/quotations/${id}`);
       if (res.success && res.quotation) {
-        printQuotationPDF(res.quotation, settings);
+        printQuotationPDF(res.quotation, pdfSettings);
       }
     } catch (err) {
       setToast({ isOpen: true, type: 'error', message: 'Failed to print quotation' });
@@ -171,7 +188,7 @@ export default function QuotationsPage() {
     try {
       const res = await apiRequest(`/quotations/${id}`);
       if (res.success && res.quotation) {
-        shareOnWhatsApp('quotation', res.quotation, settings, (msg) => setToast({ isOpen: true, type: 'info', message: msg }));
+        shareOnWhatsApp('quotation', res.quotation, pdfSettings, (msg) => setToast({ isOpen: true, type: 'info', message: msg }));
       }
     } catch (err) {
       setToast({ isOpen: true, type: 'error', message: 'Failed to share quotation' });
@@ -300,7 +317,7 @@ export default function QuotationsPage() {
       {/* Create New Quotation Modal */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); resetQuotationForm(); }}
         title="Create New B2B Price Quotation"
         subtitle="Prepare official commercial price estimate for clients"
         maxWidth="max-w-3xl"
@@ -336,6 +353,21 @@ export default function QuotationsPage() {
               value={validDays}
               onChange={(e) => setValidDays(e.target.value)}
               placeholder="15"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Customer GSTIN"
+              value={customerGstin}
+              onChange={(e) => setCustomerGstin(e.target.value)}
+              placeholder="22AAAAA0000A1Z5"
+            />
+            <Input
+              label="Customer PAN"
+              value={customerPan}
+              onChange={(e) => setCustomerPan(e.target.value)}
+              placeholder="AAAAA0000A"
             />
           </div>
 
@@ -385,7 +417,12 @@ export default function QuotationsPage() {
                 <tbody className="divide-y divide-slate-200 dark:divide-[#2D3138] text-slate-900 dark:text-[#F1F1F1]">
                   {qtnItems.map((item, idx) => (
                     <tr key={idx}>
-                      <td className="p-2.5 font-semibold">{item.product_name}</td>
+                      <td className="p-2.5">
+                        <span className="font-semibold">{item.product_name}</span>
+                        {item.hsn_sac && (
+                          <p className="text-[10px] text-slate-500 dark:text-[#9CA3AF] font-mono mt-0.5">HSN: {item.hsn_sac}</p>
+                        )}
+                      </td>
                       <td className="p-2.5">{formatCurrency(item.unit_price)}</td>
                       <td className="p-2.5 text-center">
                         <input
@@ -432,7 +469,7 @@ export default function QuotationsPage() {
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-[#2D3138]">
-            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
+            <Button type="button" variant="ghost" onClick={() => { setIsModalOpen(false); resetQuotationForm(); }}>
               Cancel
             </Button>
             <Button type="submit" variant="primary">

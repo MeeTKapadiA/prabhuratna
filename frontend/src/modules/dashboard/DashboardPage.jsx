@@ -208,7 +208,7 @@ export default function DashboardPage() {
                   <Badge variant="danger">OUT OF STOCK</Badge>
                   <div>
                     <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1]">{prod.name}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku} {prod.barcode && `| Barcode: ${prod.barcode}`}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku}{prod.hsn_code && ` | HSN: ${prod.hsn_code}`}</p>
                   </div>
                 </div>
 
@@ -234,7 +234,7 @@ export default function DashboardPage() {
                   <Badge variant="warning">LOW STOCK</Badge>
                   <div>
                     <p className="text-xs font-bold text-slate-900 dark:text-[#F1F1F1]">{prod.name}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku} {prod.barcode && `| Barcode: ${prod.barcode}`}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-[#9CA3AF]">SKU: {prod.sku}{prod.hsn_code && ` | HSN: ${prod.hsn_code}`}</p>
                   </div>
                 </div>
 
