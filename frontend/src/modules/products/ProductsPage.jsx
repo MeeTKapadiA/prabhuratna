@@ -10,8 +10,11 @@ import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
 import { formatCurrency, formatDate } from '../../services/calcService';
 import { Plus, Edit2, Trash2, Package, Globe, Eye, EyeOff, Upload, X, Image as ImageIcon, Tag } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ProductsPage() {
+  const { hasPermission, isAdmin } = useAuth();
+  const canManage = isAdmin || hasPermission('products', 'add');
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
@@ -257,7 +260,7 @@ export default function ProductsPage() {
   };
 
   const columns = [
-    {
+    ...(canManage ? [{
       header: 'Actions',
       className: 'w-16 text-center',
       render: (row) => (
@@ -282,7 +285,7 @@ export default function ProductsPage() {
           ]}
         />
       )
-    },
+    }] : []),
     {
       header: 'Product Details',
       accessor: 'name',
@@ -384,12 +387,16 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={handleOpenCategoryModal} variant="secondary" icon={Tag}>
-            Manage Categories
-          </Button>
-          <Button onClick={handleOpenAddModal} variant="primary" icon={Plus}>
-            Add New Product
-          </Button>
+          {canManage && (
+            <>
+              <Button onClick={handleOpenCategoryModal} variant="secondary" icon={Tag}>
+                Manage Categories
+              </Button>
+              <Button onClick={handleOpenAddModal} variant="primary" icon={Plus}>
+                Add New Product
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

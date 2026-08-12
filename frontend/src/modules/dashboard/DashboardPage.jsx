@@ -83,12 +83,13 @@ export default function DashboardPage() {
     );
   }
 
-  const sales = stats.sales || { today: { total: 0, count: 0 }, weekly: { total: 0, count: 0 }, monthly: { total: 0, count: 0 } };
+  const sales = stats.sales || { today: { total: 0, count: 0 }, weekly: { total: 0, count: 0 }, monthly: { total: 0, count: 0 }, staffToday: null };
   const inventory = stats.inventory || { totalProducts: 0, lowStockProducts: 0, outOfStockProducts: 0, lowStockList: [], outOfStockList: [] };
   const profit = stats.profit || { grossMarginPercent: 0, grossProfit: 0, totalRevenue: 0, totalCost: 0 };
   const insights = stats.insights || { topProfitable: [], lowestProfitable: [] };
   const chartData = stats.chartData || [];
   const isStaffView = stats.role === 'staff';
+  const todayDisplay = isStaffView && stats.sales?.staffToday ? stats.sales.staffToday : sales.today;
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
@@ -113,38 +114,42 @@ export default function DashboardPage() {
       </div>
 
       {/* Primary Financial Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isStaffView ? 'lg:grid-cols-2' : 'lg:grid-cols-4'} gap-4`}>
         <StatCard
-          title="Today's Sales"
-          value={formatCurrency(sales.today?.total || 0)}
-          subtitle={`${sales.today?.count || 0} Transactions Today`}
+          title={isStaffView ? "My Today's Sales" : "Today's Sales"}
+          value={formatCurrency(todayDisplay?.total || 0)}
+          subtitle={`${todayDisplay?.count || 0} Transactions Today`}
           icon={ShoppingBag}
           color="sky"
         />
 
-        <StatCard
-          title="Weekly Revenue"
-          value={formatCurrency(sales.weekly?.total || 0)}
-          subtitle="Last 7 Days Sales"
-          icon={DollarSign}
-          color="emerald"
-        />
+        {!isStaffView && (
+          <>
+            <StatCard
+              title="Weekly Revenue"
+              value={formatCurrency(sales.weekly?.total || 0)}
+              subtitle="Last 7 Days Sales"
+              icon={DollarSign}
+              color="emerald"
+            />
 
-        <StatCard
-          title="Monthly Revenue"
-          value={formatCurrency(sales.monthly?.total || 0)}
-          subtitle="Last 30 Days Sales"
-          icon={TrendingUp}
-          color="purple"
-        />
+            <StatCard
+              title="Monthly Revenue"
+              value={formatCurrency(sales.monthly?.total || 0)}
+              subtitle="Last 30 Days Sales"
+              icon={TrendingUp}
+              color="purple"
+            />
 
-        <StatCard
-          title="Gross Profit Margin"
-          value={`${profit.grossMarginPercent || 0}%`}
-          subtitle={`Gross Profit: ${formatCurrency(profit.grossProfit || 0)}`}
-          icon={PieChart}
-          color="amber"
-        />
+            <StatCard
+              title="Gross Profit Margin"
+              value={`${profit.grossMarginPercent || 0}%`}
+              subtitle={`Gross Profit: ${formatCurrency(profit.grossProfit || 0)}`}
+              icon={PieChart}
+              color="amber"
+            />
+          </>
+        )}
       </div>
 
       {/* Inventory Health Stat Cards */}
@@ -256,7 +261,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Chart & Insights Row */}
+      {/* Chart & Insights Row — admin / superadmin only */}
+      {!isStaffView && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Dynamic Theme-Aware Recharts Sales Trend (2 Cols) */}
         <div className="lg:col-span-2 glass-panel p-5 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-4 shadow-sm">
@@ -325,6 +331,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

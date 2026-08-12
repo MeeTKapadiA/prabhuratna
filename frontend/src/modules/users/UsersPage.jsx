@@ -159,6 +159,9 @@ export default function UsersPage() {
       header: 'Actions',
       className: 'w-16 text-center',
       render: (row) => (
+        row.role === 'superadmin' ? (
+          <span className="text-[10px] text-slate-400">—</span>
+        ) : (
         <TableActionsMenu
           actions={[
             {
@@ -170,7 +173,7 @@ export default function UsersPage() {
                   name: row.name,
                   username: row.username || '',
                   email: row.email,
-                  role: row.role,
+                  role: row.role === 'admin' ? 'admin' : 'staff',
                   status: row.status
                 });
                 setIsEditModalOpen(true);
@@ -198,6 +201,7 @@ export default function UsersPage() {
             }
           ]}
         />
+        )
       )
     },
     {
@@ -206,7 +210,7 @@ export default function UsersPage() {
       render: (row) => (
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-sm ${
-            row.role === 'admin' ? 'bg-[#C0392B] dark:bg-[#E74C3C]' : 'bg-slate-700'
+            row.role === 'superadmin' ? 'bg-amber-600' : row.role === 'admin' ? 'bg-[#C0392B] dark:bg-[#E74C3C]' : 'bg-slate-700'
           }`}>
             {row.name.charAt(0).toUpperCase()}
           </div>
@@ -221,7 +225,7 @@ export default function UsersPage() {
       header: 'System Role',
       accessor: 'role',
       render: (row) => (
-        <Badge variant={row.role === 'admin' ? 'danger' : 'info'}>
+        <Badge variant={row.role === 'superadmin' || row.role === 'admin' ? 'danger' : 'info'}>
           {row.role.toUpperCase()}
         </Badge>
       )

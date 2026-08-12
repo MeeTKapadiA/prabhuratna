@@ -17,7 +17,9 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const role = user?.role || 'staff';
-  const isAdmin = role === 'admin';
+  const isSuperAdmin = role === 'superadmin';
+  // Shop-owner admin features: admin + superadmin (superadmin inherits admin)
+  const isAdmin = role === 'admin' || isSuperAdmin;
 
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -30,19 +32,16 @@ export function AuthProvider({ children }) {
 
   // Permission check helper
   const hasPermission = (module, action = 'view') => {
-    if (isAdmin) return true; // Admin has full unrestricted access
+    if (isAdmin) return true; // Admin + superadmin: full business access
 
-    // Staff permissions mapping
+    // Staff: counter job only — billing, dashboard view, products view, inventory adjust/logs
     if (role === 'staff') {
       if (module === 'dashboard') return ['view'].includes(action);
-      if (module === 'products') return ['view', 'add', 'edit'].includes(action);
-      if (module === 'billing' || module === 'invoices') return ['view', 'create', 'print', 'download'].includes(action);
+      if (module === 'products') return ['view'].includes(action);
+      if (module === 'billing' || module === 'invoices') {
+        return ['view', 'create', 'print', 'download'].includes(action);
+      }
       if (module === 'inventory') return ['view', 'update'].includes(action);
-      if (module === 'suppliers') return ['view', 'create', 'edit'].includes(action);
-      if (module === 'purchases') return ['view', 'create', 'edit'].includes(action);
-      if (module === 'returns') return ['view', 'create'].includes(action);
-      if (module === 'customers') return ['view', 'create', 'edit'].includes(action);
-      if (module === 'cashbook') return ['view', 'create', 'edit'].includes(action);
       return false;
     }
     return false;
@@ -84,6 +83,7 @@ export function AuthProvider({ children }) {
       token,
       role,
       isAdmin,
+      isSuperAdmin,
       isAuthenticated: !!token,
       isLoading,
       login,

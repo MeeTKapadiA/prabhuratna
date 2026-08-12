@@ -6,7 +6,7 @@ POS billing, GST invoices, inventory, purchases, customers (udhaar), cashbook, a
 
 - **Frontend:** React + Vite + Tailwind (`frontend/`)
 - **Backend:** Express + better-sqlite3 (`backend/`)
-- **Deploy:** Vercel (static frontend + serverless `/api`)
+- **Deploy:** Frontend on Vercel/custom domain; **API on Render with a persistent disk** (SQLite survives redeploys)
 
 ## Local setup
 
@@ -35,15 +35,24 @@ Public signup is disabled. Create users from **User Management** (admin only).
 
 ## Environment variables
 
-See `.env.example`. On Vercel set at least:
+See `.env.example`.
+
+### Production API (Render — keeps client data)
 
 | Name | Example |
 |------|---------|
+| `DB_PATH` | `/var/data/database.sqlite` (persistent disk mount) |
 | `JWT_SECRET` | strong random (`openssl rand -base64 48`) |
-| `ALLOWED_ORIGINS` | `https://your-app.vercel.app` |
-| `NODE_ENV` | `production` (optional) |
+| `ALLOWED_ORIGINS` | `https://prabhuratna.in,https://www.prabhuratna.in` |
+| `NODE_ENV` | `production` |
 
-Do **not** set `VITE_API_URL` when frontend and API share the same Vercel project.
+Attach a **Persistent Disk** on Render (mount `/var/data`). Without `DB_PATH`, data can be wiped on redeploy.
+
+Frontend: set `VITE_API_URL` to your Render API URL + `/api`, then rebuild.
+
+### Vercel-only /tmp (demos)
+
+SQLite on Vercel `/tmp` is **ephemeral** — do not use for a live shop.
 
 ## Security smoke tests
 
@@ -71,5 +80,5 @@ Config: `sonar-project.properties`
 
 ## Notes
 
-- SQLite on Vercel `/tmp` is ephemeral — use for demos; move to Postgres for production shop data.
+- **Never run the live shop API on Vercel serverless `/tmp`** — products and invoices will disappear. Use Render (or any VPS) with `DB_PATH` on a persistent disk (`render.yaml` included).
 - Invoice edit/delete is not allowed — cancel + credit note only.

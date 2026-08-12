@@ -1,0 +1,32 @@
+# Render Blueprint — API with persistent SQLite disk
+# Docs: https://render.com/docs/blueprint-spec
+#
+# After first deploy:
+# 1. Attach env: JWT_SECRET, ALLOWED_ORIGINS=https://prabhuratna.in,https://www.prabhuratna.in
+# 2. Confirm disk is mounted at /var/data (DB_PATH is set below)
+# 3. Point frontend VITE_API_URL to this service URL + /api (e.g. https://prabhuratna-api.onrender.com/api)
+
+services:
+  - type: web
+    name: prabhuratna-api
+    runtime: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /var/data/database.sqlite
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+    disk:
+      name: prabhuratna-sqlite
+      mountPath: /var/data
+      sizeGB: 1

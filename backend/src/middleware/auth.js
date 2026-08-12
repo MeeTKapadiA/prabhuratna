@@ -38,7 +38,12 @@ function authenticateToken(req, res, next) {
 }
 
 function requireRole(allowedRoles = []) {
-  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  const roles = Array.isArray(allowedRoles) ? [...allowedRoles] : [allowedRoles];
+
+  // Superadmin inherits every admin-gated route; exclusive routes use ['superadmin'] only.
+  if (roles.includes('admin') && !roles.includes('superadmin')) {
+    roles.push('superadmin');
+  }
 
   return (req, res, next) => {
     if (!req.user) {

@@ -5,7 +5,7 @@ import { getAccessibleNavSections } from '../../config/navConfig';
 import { ShieldCheck, X, ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose, isCollapsed }) {
-  const { user, isAdmin, hasPermission } = useAuth();
+  const { user, isAdmin, isSuperAdmin, hasPermission } = useAuth();
   const location = useLocation();
 
   // Get accessible sections and items
@@ -108,7 +108,11 @@ export default function Sidebar({ isOpen, onClose, isCollapsed }) {
               <div className="flex items-center justify-between">
                 <p className="font-bold text-slate-900 dark:text-[#F1F1F1] truncate">{user?.name || 'User'}</p>
                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
-                  isAdmin ? 'bg-[#C0392B] text-white' : 'bg-slate-700 text-white'
+                  isSuperAdmin
+                    ? 'bg-amber-600 text-white'
+                    : isAdmin
+                      ? 'bg-[#C0392B] text-white'
+                      : 'bg-slate-700 text-white'
                 }`}>
                   {user?.role || 'Staff'}
                 </span>

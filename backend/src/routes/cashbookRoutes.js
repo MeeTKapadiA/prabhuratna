@@ -3,9 +3,9 @@ const router = express.Router();
 const cashbookController = require('../controllers/cashbookController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-router.use(authenticateToken);
+router.use(authenticateToken, requireRole(['admin']));
 router.get('/', cashbookController.getCashbook);
 router.post('/', cashbookController.saveCashbook);
-router.get('/supplier-aging', requireRole(['admin']), cashbookController.getSupplierAging);
+router.get('/supplier-aging', cashbookController.getSupplierAging);
 
 module.exports = router;

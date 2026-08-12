@@ -63,21 +63,24 @@ export const NAV_SECTIONS = [
         label: 'Returns & Exchanges',
         path: '/app/returns',
         icon: RotateCcw,
-        module: 'returns'
+        module: 'returns',
+        adminOnly: true
       },
       {
         id: 'credit-notes',
         label: 'Credit Notes',
         path: '/app/credit-notes',
         icon: FileMinus,
-        module: 'billing'
+        module: 'billing',
+        adminOnly: true
       },
       {
         id: 'customers',
         label: 'Customers / Udhaar',
         path: '/app/customers',
         icon: UserCircle,
-        module: 'customers'
+        module: 'customers',
+        adminOnly: true
       }
     ]
   },
@@ -104,14 +107,16 @@ export const NAV_SECTIONS = [
         label: 'Purchases',
         path: '/app/purchases',
         icon: ShoppingBag,
-        module: 'purchases'
+        module: 'purchases',
+        adminOnly: true
       },
       {
         id: 'suppliers',
         label: 'Suppliers',
         path: '/app/suppliers',
         icon: Truck,
-        module: 'suppliers'
+        module: 'suppliers',
+        adminOnly: true
       }
     ]
   },
@@ -124,7 +129,8 @@ export const NAV_SECTIONS = [
         label: 'Cashbook',
         path: '/app/cashbook',
         icon: BookOpen,
-        module: 'cashbook'
+        module: 'cashbook',
+        adminOnly: true
       },
       {
         id: 'expenses',
@@ -162,7 +168,7 @@ export const NAV_SECTIONS = [
         path: '/app/activity',
         icon: ScrollText,
         module: 'audit',
-        adminOnly: true
+        superAdminOnly: true
       },
       {
         id: 'users',
@@ -170,7 +176,7 @@ export const NAV_SECTIONS = [
         path: '/app/users',
         icon: Users,
         module: 'users',
-        adminOnly: true
+        superAdminOnly: true
       },
       {
         id: 'settings',
@@ -186,10 +192,12 @@ export const NAV_SECTIONS = [
 
 export function getAccessibleNavSections(user, hasPermission) {
   if (!user) return [];
-  const isAdmin = user.role === 'admin';
+  const isSuperAdmin = user.role === 'superadmin';
+  const isAdmin = user.role === 'admin' || isSuperAdmin;
 
   return NAV_SECTIONS.map((section) => {
     const accessibleItems = section.items.filter((item) => {
+      if (item.superAdminOnly) return isSuperAdmin;
       if (isAdmin) return true;
       if (item.adminOnly) return false;
       return hasPermission ? hasPermission(item.module, 'view') : true;

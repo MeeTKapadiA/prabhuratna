@@ -36,6 +36,22 @@ function RequireAdmin({ children }) {
   return children;
 }
 
+function RequireSuperAdmin({ children }) {
+  const { isSuperAdmin } = useAuth();
+  if (!isSuperAdmin) {
+    return <UnauthorizedPage />;
+  }
+  return children;
+}
+
+function RequirePermission({ module, children }) {
+  const { hasPermission } = useAuth();
+  if (!hasPermission(module, 'view')) {
+    return <UnauthorizedPage />;
+  }
+  return children;
+}
+
 function IndexRedirect() {
   const { user, hasPermission } = useAuth();
   const defaultRoute = getDefaultRouteForUser(user, hasPermission);
@@ -83,23 +99,23 @@ export default function App() {
 
               <Route path="/app" element={<ProtectedLayout />}>
                 <Route index element={<IndexRedirect />} />
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="billing" element={<BillingPage />} />
-                <Route path="invoices" element={<InvoicesPage />} />
-                <Route path="products" element={<ProductsPage />} />
-                <Route path="suppliers" element={<SuppliersPage />} />
-                <Route path="purchases" element={<PurchasesPage />} />
-                <Route path="returns" element={<ReturnsPage />} />
-                <Route path="quotations" element={<QuotationsPage />} />
-                <Route path="inventory" element={<InventoryPage />} />
-                <Route path="customers" element={<CustomersPage />} />
-                <Route path="credit-notes" element={<CreditNotesPage />} />
-                <Route path="cashbook" element={<CashbookPage />} />
+                <Route path="dashboard" element={<RequirePermission module="dashboard"><DashboardPage /></RequirePermission>} />
+                <Route path="billing" element={<RequirePermission module="billing"><BillingPage /></RequirePermission>} />
+                <Route path="invoices" element={<RequirePermission module="invoices"><InvoicesPage /></RequirePermission>} />
+                <Route path="products" element={<RequirePermission module="products"><ProductsPage /></RequirePermission>} />
+                <Route path="suppliers" element={<RequireAdmin><SuppliersPage /></RequireAdmin>} />
+                <Route path="purchases" element={<RequireAdmin><PurchasesPage /></RequireAdmin>} />
+                <Route path="returns" element={<RequireAdmin><ReturnsPage /></RequireAdmin>} />
+                <Route path="quotations" element={<RequirePermission module="billing"><QuotationsPage /></RequirePermission>} />
+                <Route path="inventory" element={<RequirePermission module="inventory"><InventoryPage /></RequirePermission>} />
+                <Route path="customers" element={<RequireAdmin><CustomersPage /></RequireAdmin>} />
+                <Route path="credit-notes" element={<RequireAdmin><CreditNotesPage /></RequireAdmin>} />
+                <Route path="cashbook" element={<RequireAdmin><CashbookPage /></RequireAdmin>} />
                 <Route path="expenses" element={<RequireAdmin><ExpensesPage /></RequireAdmin>} />
-                <Route path="activity" element={<RequireAdmin><ActivityLogPage /></RequireAdmin>} />
+                <Route path="activity" element={<RequireSuperAdmin><ActivityLogPage /></RequireSuperAdmin>} />
                 <Route path="profit-margin" element={<RequireAdmin><ProfitMarginPage /></RequireAdmin>} />
                 <Route path="reports" element={<RequireAdmin><ReportsPage /></RequireAdmin>} />
-                <Route path="users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
+                <Route path="users" element={<RequireSuperAdmin><UsersPage /></RequireSuperAdmin>} />
                 <Route path="settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />
                 <Route path="unauthorized" element={<UnauthorizedPage />} />
               </Route>

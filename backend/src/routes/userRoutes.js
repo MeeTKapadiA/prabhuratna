@@ -3,8 +3,8 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-// All User Management endpoints require authentication and Admin role
-router.use(authenticateToken, requireRole(['admin']));
+// User management is superadmin-only (not creatable/assignable via UI for shop admins)
+router.use(authenticateToken, requireRole(['superadmin']));
 
 router.get('/', userController.getAllUsers);
 router.post('/', userController.createUser);

@@ -3,25 +3,62 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
-let dbPath = path.join(__dirname, '../../database.sqlite');
+const BUNDLED_DB_PATH = path.join(__dirname, '../../database.sqlite');
 
-// If running in Vercel serverless environment, copy db to /tmp for write access
-if (process.env.VERCEL) {
-  const tmpPath = path.join('/tmp', 'database.sqlite');
-  try {
-    if (!fs.existsSync(tmpPath) && fs.existsSync(dbPath)) {
-      fs.copyFileSync(dbPath, tmpPath);
+/**
+ * Resolve a durable SQLite path.
+ * Priority:
+ *   1. DB_PATH env (Render persistent disk, VPS volume, etc.) — REQUIRED for production shop data
+ *   2. Vercel /tmp fallback (EPHEMERAL — demo only; data wiped on cold start / redeploy)
+ *   3. Local backend/database.sqlite
+ */
+function resolveDatabasePath() {
+  const configured = process.env.DB_PATH && String(process.env.DB_PATH).trim();
+  if (configured) {
+    const resolved = path.resolve(configured);
+    const dir = path.dirname(resolved);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-    dbPath = tmpPath;
-  } catch (err) {
-    console.error('Failed to copy SQLite database to /tmp:', err);
+    // First boot on a fresh volume: seed from the bundled file if present
+    if (!fs.existsSync(resolved) && fs.existsSync(BUNDLED_DB_PATH)) {
+      fs.copyFileSync(BUNDLED_DB_PATH, resolved);
+      console.log(`[db] Initialized persistent database at ${resolved} from bundled seed`);
+    } else if (!fs.existsSync(resolved)) {
+      console.log(`[db] Creating new persistent database at ${resolved}`);
+    } else {
+      console.log(`[db] Using persistent database at ${resolved}`);
+    }
+    return resolved;
   }
+
+  if (process.env.VERCEL) {
+    const tmpPath = path.join('/tmp', 'database.sqlite');
+    try {
+      if (!fs.existsSync(tmpPath) && fs.existsSync(BUNDLED_DB_PATH)) {
+        fs.copyFileSync(BUNDLED_DB_PATH, tmpPath);
+      }
+    } catch (err) {
+      console.error('Failed to copy SQLite database to /tmp:', err);
+    }
+    console.warn(
+      '[db] WARNING: Running on Vercel /tmp — database is EPHEMERAL. ' +
+      'Products/invoices will be lost on redeploy. Set DB_PATH on a host with a persistent disk (e.g. Render).'
+    );
+    return tmpPath;
+  }
+
+  return BUNDLED_DB_PATH;
 }
 
+const dbPath = resolveDatabasePath();
 const db = new Database(dbPath);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
+// Survive crashes better on persistent disks
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
 
 function runMigration(sql) {
   try {
@@ -555,6 +592,70 @@ function initDb() {
       INSERT INTO users (name, username, email, password, role, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run('Store Staff', 'staff', 'staff@prabhuratna.com', hashedStaffPass, 'staff', 'active');
+  }
+
+  // One-time superadmin seed (credentials from env; password default set per shop request)
+  const saUsername = String(process.env.SUPERADMIN_USERNAME || 'superadmin').trim();
+  const saEmail = String(process.env.SUPERADMIN_EMAIL || 'superadmin@prabhuratna.local').trim();
+  const saPassword = String(process.env.SUPERADMIN_PASSWORD || '@Meet121603');
+  const superCheck = db.prepare('SELECT id FROM users WHERE email = ? OR username = ? OR role = ?')
+    .get(saEmail, saUsername, 'superadmin');
+  if (!superCheck) {
+    const hashedSuperPass = bcrypt.hashSync(saPassword, 12);
+    db.prepare(`
+      INSERT INTO users (name, username, email, password, role, status)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run('Super Admin', saUsername, saEmail, hashedSuperPass, 'superadmin', 'active');
+  }
+
+  // Permanent shop-owner accounts (hardcoded — always re-ensure; never rely on UI alone)
+  // These vanish on serverless /tmp resets if only created via frontend.
+  const PROTECTED_SHOP_USERS = [
+    {
+      name: 'Rajesh Kansara',
+      username: 'Rajeshkansara',
+      email: 'rajeshkansara@prabhuratna.local',
+      password: 'America0013@',
+      role: 'admin'
+    },
+    {
+      name: 'Aaditya Kansara',
+      username: 'Aadityakansara',
+      email: 'aadityakansara@prabhuratna.local',
+      password: 'Ireland0013@',
+      role: 'admin'
+    },
+    {
+      name: 'Piyush Kansara',
+      username: 'Piyushkansara',
+      email: 'piyushkansara@prabhuratna.local',
+      password: 'India0013@',
+      role: 'admin'
+    }
+  ];
+
+  const findProtectedUser = db.prepare(
+    'SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)'
+  );
+  const insertProtectedUser = db.prepare(`
+    INSERT INTO users (name, username, email, password, role, status)
+    VALUES (?, ?, ?, ?, ?, 'active')
+  `);
+  const restoreProtectedUser = db.prepare(`
+    UPDATE users
+    SET name = ?, username = ?, email = ?, password = ?, role = ?, status = 'active'
+    WHERE id = ?
+  `);
+
+  for (const u of PROTECTED_SHOP_USERS) {
+    const existing = findProtectedUser.get(u.username, u.email);
+    const hashed = bcrypt.hashSync(u.password, 12);
+    if (!existing) {
+      insertProtectedUser.run(u.name, u.username, u.email, hashed, u.role);
+    } else {
+      // Keep credentials + role/status in sync so redeploys cannot "lose" them
+      restoreProtectedUser.run(u.name, u.username, u.email, hashed, u.role, existing.id);
+    }
   }
 
   // Seed default demo products if empty

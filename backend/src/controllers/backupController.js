@@ -5,15 +5,10 @@ const db = require('../config/db');
 // Export SQLite Database File
 exports.exportDatabase = (req, res) => {
   try {
-    let dbPath = path.join(__dirname, '../../database.sqlite');
-    if (process.env.VERCEL) {
-      const tmpPath = path.join('/tmp', 'database.sqlite');
-      if (fs.existsSync(tmpPath)) {
-        dbPath = tmpPath;
-      }
-    }
+    // better-sqlite3 exposes the open file path as db.name (respects DB_PATH / persistent disk)
+    const dbFilePath = db.name || path.join(__dirname, '../../database.sqlite');
 
-    if (!fs.existsSync(dbPath)) {
+    if (!fs.existsSync(dbFilePath)) {
       return res.status(404).json({ success: false, message: 'Database file not found' });
     }
 
@@ -22,10 +17,17 @@ exports.exportDatabase = (req, res) => {
     const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
     const fileName = `prabhuratna_backup_${dateStr}_${timeStr}.sqlite`;
 
+    // Checkpoint WAL so backup includes latest writes
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (_) {
+      /* non-fatal */
+    }
+
     res.setHeader('Content-Type', 'application/x-sqlite3');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
-    return res.download(dbPath, fileName, (err) => {
+    return res.download(dbFilePath, fileName, (err) => {
       if (err && !res.headersSent) {
         console.error('Download error:', err);
         return res.status(500).json({ success: false, message: 'Failed to download database file' });

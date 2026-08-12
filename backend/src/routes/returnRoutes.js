@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const returnController = require('../controllers/returnController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
-router.post('/', authenticateToken, returnController.createReturn);
-router.get('/', authenticateToken, returnController.getAllReturns);
-router.get('/lookup/:invoiceNumber', authenticateToken, returnController.lookupInvoiceForReturn);
-router.get('/:id', authenticateToken, returnController.getReturnById);
+router.use(authenticateToken, requireRole(['admin']));
+router.post('/', returnController.createReturn);
+router.get('/', returnController.getAllReturns);
+router.get('/lookup/:invoiceNumber', returnController.lookupInvoiceForReturn);
+router.get('/:id', returnController.getReturnById);
 
 module.exports = router;

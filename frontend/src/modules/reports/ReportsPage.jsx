@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { BarChart3, FileSpreadsheet, Download, Calendar, Filter, Printer, Database, FileText, HardDrive, Package, ShoppingBag, RotateCcw } from 'lucide-react';
 
 export default function ReportsPage() {
-  const { isAdmin } = useAuth();
+  const { isSuperAdmin } = useAuth();
   const [reportType, setReportType] = useState('sales'); // 'sales', 'inventory', 'profit'
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -207,13 +207,13 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Admin Backup & Data Export Control Panel */}
-      {isAdmin && (
+      {/* Superadmin Backup & Data Export Control Panel */}
+      {isSuperAdmin && (
         <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-[#2D3138] bg-white dark:bg-[#1E2126] space-y-4 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-[#2D3138]">
             <div>
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2">
-                <Database className="w-4 h-4 text-[#C0392B] dark:text-[#E74C3C]" /> Backup & Raw Data Export (Admin Only)
+                <Database className="w-4 h-4 text-[#C0392B] dark:text-[#E74C3C]" /> Backup & Raw Data Export (Superadmin Only)
               </h3>
               <p className="text-xs text-slate-500">Download full SQLite database binary or export individual modules into CSV spreadsheet sheets</p>
             </div>

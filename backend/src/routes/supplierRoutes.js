@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const supplierController = require('../controllers/supplierController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
-router.post('/', authenticateToken, supplierController.createSupplier);
-router.get('/', authenticateToken, supplierController.getAllSuppliers);
-router.get('/:id', authenticateToken, supplierController.getSupplierById);
-router.put('/:id', authenticateToken, supplierController.updateSupplier);
+router.use(authenticateToken, requireRole(['admin']));
+router.post('/', supplierController.createSupplier);
+router.get('/', supplierController.getAllSuppliers);
+router.get('/:id', supplierController.getSupplierById);
+router.put('/:id', supplierController.updateSupplier);
 
 module.exports = router;

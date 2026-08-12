@@ -1,6 +1,23 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 
+/** Seeded accounts that must never be deleted / deactivated via API */
+const PROTECTED_USERNAMES = new Set([
+  'superadmin',
+  'rajeshkansara',
+  'aadityakansara',
+  'piyushkansara',
+  'admin',
+  'staff'
+]);
+
+function isProtectedUser(user) {
+  if (!user) return false;
+  if (user.role === 'superadmin') return true;
+  const uname = String(user.username || '').toLowerCase();
+  return PROTECTED_USERNAMES.has(uname);
+}
+
 // Get all users
 exports.getAllUsers = (req, res) => {
   try {
@@ -49,6 +66,13 @@ exports.createUser = (req, res) => {
       return res.status(400).json({ success: false, message: 'Name, email, password, and role are required.' });
     }
 
+    if (String(role).toLowerCase() === 'superadmin') {
+      return res.status(400).json({
+        success: false,
+        message: 'The superadmin role cannot be assigned through the API.'
+      });
+    }
+
     const finalUsername = (username || email.split('@')[0]).trim();
     const finalRole = role === 'admin' ? 'admin' : 'staff';
     const finalStatus = status === 'inactive' ? 'inactive' : 'active';
@@ -88,9 +112,39 @@ exports.updateUser = (req, res) => {
     const { id } = req.params;
     const { name, username, email, role, status } = req.body;
 
-    const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, role, username FROM users WHERE id = ?').get(id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role === 'superadmin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Superadmin accounts cannot be modified through the API.'
+      });
+    }
+
+    if (isProtectedUser(user)) {
+      // Allow name/email tweaks for protected shop owners, but never demote/deactivate via role/status change to inactive
+      if (role !== undefined && role !== null && String(role).toLowerCase() !== String(user.role).toLowerCase()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Protected accounts cannot change role through the API.'
+        });
+      }
+      if (status !== undefined && status !== null && String(status).toLowerCase() === 'inactive') {
+        return res.status(400).json({
+          success: false,
+          message: 'Protected accounts cannot be deactivated through the API.'
+        });
+      }
+    }
+
+    if (role !== undefined && role !== null && String(role).toLowerCase() === 'superadmin') {
+      return res.status(400).json({
+        success: false,
+        message: 'The superadmin role cannot be assigned through the API.'
+      });
     }
 
     let finalRole = user.role;
@@ -145,10 +199,17 @@ exports.updateUser = (req, res) => {
 exports.toggleUserStatus = (req, res) => {
   try {
     const { id } = req.params;
-    const user = db.prepare('SELECT id, status, role FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, status, role, username FROM users WHERE id = ?').get(id);
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role === 'superadmin' || isProtectedUser(user)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Protected accounts cannot be deactivated through the API.'
+      });
     }
 
     if (user.id === req.user.id) {
@@ -213,9 +274,16 @@ exports.deleteUser = (req, res) => {
       return res.status(400).json({ success: false, message: 'You cannot delete your own account.' });
     }
 
-    const user = db.prepare('SELECT id, role, status FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, role, status, username FROM users WHERE id = ?').get(id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role === 'superadmin' || isProtectedUser(user)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Protected accounts cannot be deleted through the API.'
+      });
     }
 
     if (user.role === 'admin') {

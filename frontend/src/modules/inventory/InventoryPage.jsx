@@ -10,8 +10,10 @@ import TableActionsMenu from '../../components/ui/TableActionsMenu';
 import { apiRequest } from '../../services/api';
 import { formatCurrency, formatDateTime } from '../../services/calcService';
 import { Boxes, ArrowUpDown, AlertTriangle, TrendingUp, TrendingDown, Plus, Minus, History, QrCode, RefreshCw, Printer } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function InventoryPage() {
+  const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('stock'); // 'stock', 'fast', 'slow', 'logs'
   const [products, setProducts] = useState([]);
   const [fastMoving, setFastMoving] = useState([]);
@@ -235,8 +237,10 @@ export default function InventoryPage() {
           <div className="flex items-center gap-1 bg-[#FAFAF8] dark:bg-[#121417] p-1 rounded-xl border border-slate-200 dark:border-[#2D3138] text-xs font-semibold overflow-x-auto max-w-full scrollbar-none">
             {[
               { id: 'stock', label: 'Stock Master', icon: Boxes },
-              { id: 'fast', label: 'Fast Moving', icon: TrendingUp },
-              { id: 'slow', label: 'Slow Moving', icon: AlertTriangle },
+              ...(isAdmin ? [
+                { id: 'fast', label: 'Fast Moving', icon: TrendingUp },
+                { id: 'slow', label: 'Slow Moving', icon: AlertTriangle }
+              ] : []),
               { id: 'logs', label: 'Audit Logs', icon: History }
             ].map((tab) => {
               const Icon = tab.icon;

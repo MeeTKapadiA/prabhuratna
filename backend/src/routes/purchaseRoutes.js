@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
-router.post('/', authenticateToken, purchaseController.createPurchase);
-router.get('/', authenticateToken, purchaseController.getAllPurchases);
-router.get('/:id', authenticateToken, purchaseController.getPurchaseById);
-router.post('/:id/payments', authenticateToken, purchaseController.recordPurchasePayment);
+router.use(authenticateToken, requireRole(['admin']));
+router.post('/', purchaseController.createPurchase);
+router.get('/', purchaseController.getAllPurchases);
+router.get('/:id', purchaseController.getPurchaseById);
+router.post('/:id/payments', purchaseController.recordPurchasePayment);
 
 module.exports = router;

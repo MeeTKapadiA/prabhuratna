@@ -100,6 +100,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     system: 'Prabhuratna Metals - Billing & Inventory Management System',
+    persistentDb: Boolean(process.env.DB_PATH && String(process.env.DB_PATH).trim()),
     timestamp: new Date().toISOString()
   });
 });
