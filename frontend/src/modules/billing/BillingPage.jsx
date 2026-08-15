@@ -5,7 +5,7 @@ import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import Toast from '../../components/ui/Toast';
 import { apiRequest } from '../../services/api';
-import { calculateCartTotals, formatCurrency, formatDateTime } from '../../services/calcService';
+import { calculateCartTotals, formatCurrency, formatDateTime, todayLocalDate, suggestInterStateTax, splitTaxAmount } from '../../services/calcService';
 import { generateInvoicePDF, printInvoicePDF } from '../../services/pdfService';
 import { useShopSettings } from '../../context/ShopSettingsContext';
 import { WhatsAppIcon, shareOnWhatsApp } from '../../utils/whatsappHelper';
@@ -36,7 +36,7 @@ export default function BillingPage() {
   });
   
   // Checkout & Customer State
-  const [customerName, setCustomerName] = useState('Walk-in Customer');
+  const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
@@ -45,6 +45,12 @@ export default function BillingPage() {
   const [poNumber, setPoNumber] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [suggestedInvoiceNumber, setSuggestedInvoiceNumber] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(() => todayLocalDate());
+  const [taxMode, setTaxMode] = useState('CGST_SGST'); // CGST_SGST | IGST
+  const [cgstAmount, setCgstAmount] = useState('0');
+  const [sgstAmount, setSgstAmount] = useState('0');
+  const [igstAmount, setIgstAmount] = useState('0');
+  const [taxManualEdit, setTaxManualEdit] = useState(false);
   const [paymentMode, setPaymentMode] = useState('CASH');
   const [amountPaid, setAmountPaid] = useState('');
   const [overallDiscount, setOverallDiscount] = useState(0);
@@ -239,7 +245,40 @@ export default function BillingPage() {
 
   const cartTotals = calculateCartTotals(cartItems, overallDiscount, scrapValue);
   const transportVal = Math.max(0, parseFloat(transportAmount) || 0);
-  const displayGrand = Math.max(0, Math.round((cartTotals.grandTotal + transportVal) * 100) / 100);
+  const parsedCgst = Math.max(0, parseFloat(cgstAmount) || 0);
+  const parsedSgst = Math.max(0, parseFloat(sgstAmount) || 0);
+  const parsedIgst = Math.max(0, parseFloat(igstAmount) || 0);
+  const manualTaxSum = Math.round((parsedCgst + parsedSgst + parsedIgst) * 100) / 100;
+  const taxMismatch = Math.abs(manualTaxSum - cartTotals.taxAmount) > 0.02;
+  const displayGrand = Math.max(
+    0,
+    Math.round((cartTotals.subtotal - cartTotals.billDiscountAmount + manualTaxSum - cartTotals.scrapValue + transportVal) * 100) / 100
+  );
+
+  // Suggest intra/inter-state from GSTIN when customer GSTIN or shop settings change
+  useEffect(() => {
+    const inter = suggestInterStateTax(shopSettings?.shop_gstin || settings?.shop_gstin, customerGstin);
+    setTaxMode(inter ? 'IGST' : 'CGST_SGST');
+    setTaxManualEdit(false);
+  }, [customerGstin, shopSettings?.shop_gstin, settings?.shop_gstin]);
+
+  // Keep tax inputs in sync with cart unless staff manually edited amounts
+  useEffect(() => {
+    if (taxManualEdit) return;
+    const split = splitTaxAmount(cartTotals.taxAmount, taxMode);
+    setCgstAmount(String(split.cgst));
+    setSgstAmount(String(split.sgst));
+    setIgstAmount(String(split.igst));
+  }, [cartTotals.taxAmount, taxMode, taxManualEdit]);
+
+  const applyTaxMode = (mode) => {
+    setTaxMode(mode);
+    setTaxManualEdit(false);
+    const split = splitTaxAmount(cartTotals.taxAmount, mode);
+    setCgstAmount(String(split.cgst));
+    setSgstAmount(String(split.sgst));
+    setIgstAmount(String(split.igst));
+  };
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
@@ -275,6 +314,11 @@ export default function BillingPage() {
         customer_address: customerAddress,
         po_number: poNumber,
         invoice_number: invoiceNumberOverride,
+        invoice_date: invoiceDate || todayLocalDate(),
+        is_inter_state: taxMode === 'IGST',
+        cgst_amount: parsedCgst,
+        sgst_amount: parsedSgst,
+        igst_amount: parsedIgst,
         payment_mode: paymentMode,
         amount_paid: paid,
         discount_amount: cartTotals.billDiscountAmount,
@@ -311,13 +355,15 @@ export default function BillingPage() {
         setCompletedInvoice(res.invoice);
         setIsInvoiceModalOpen(true);
         setCartItems([]);
-        setCustomerName('Walk-in Customer');
+        setCustomerName('');
         setCustomerPhone('');
         setCustomerEmail('');
         setCustomerGstin('');
         setCustomerPan('');
         setCustomerAddress('');
         setPoNumber('');
+        setInvoiceDate(todayLocalDate());
+        setTaxManualEdit(false);
         setOverallDiscount(0);
         setScrapValue(0);
         setTransportAmount(0);
@@ -355,6 +401,11 @@ export default function BillingPage() {
             String(invoiceNumber || '').trim() !== suggestedInvoiceNumber
               ? String(invoiceNumber).trim()
               : '',
+          invoice_date: invoiceDate || todayLocalDate(),
+          is_inter_state: taxMode === 'IGST',
+          cgst_amount: parsedCgst,
+          sgst_amount: parsedSgst,
+          igst_amount: parsedIgst,
           payment_mode: paymentMode,
           amount_paid: paymentMode === 'CREDIT' ? 0 : displayGrand,
           discount_amount: cartTotals.billDiscountAmount,
@@ -713,13 +764,21 @@ export default function BillingPage() {
                   className="min-w-0"
                 />
                 <Input
-                  label="PO Number"
-                  value={poNumber}
-                  onChange={(e) => setPoNumber(e.target.value)}
-                  placeholder="Optional PO / Order No."
+                  label="Invoice Date"
+                  type="date"
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
                   className="min-w-0"
                 />
               </div>
+
+              <Input
+                label="PO Number"
+                value={poNumber}
+                onChange={(e) => setPoNumber(e.target.value)}
+                placeholder="Optional PO / Order No."
+                className="min-w-0"
+              />
 
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 <div className="min-w-0">
@@ -759,6 +818,89 @@ export default function BillingPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Tax Breakdown — editable CGST/SGST/IGST */}
+            <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-[#2D3138] bg-slate-50/80 dark:bg-[#121417]">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
+                  Tax Breakdown
+                </label>
+                <span className="text-[10px] text-slate-500">
+                  Computed GST: {formatCurrency(cartTotals.taxAmount)}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => applyTaxMode('CGST_SGST')}
+                  className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all ${
+                    taxMode === 'CGST_SGST'
+                      ? 'bg-[#C0392B]/10 border-[#C0392B] text-[#C0392B]'
+                      : 'bg-white dark:bg-[#1E2126] border-slate-200 dark:border-[#2D3138] text-slate-600'
+                  }`}
+                >
+                  Intra-state (CGST+SGST)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyTaxMode('IGST')}
+                  className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all ${
+                    taxMode === 'IGST'
+                      ? 'bg-[#C0392B]/10 border-[#C0392B] text-[#C0392B]'
+                      : 'bg-white dark:bg-[#1E2126] border-slate-200 dark:border-[#2D3138] text-slate-600'
+                  }`}
+                >
+                  Inter-state (IGST)
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Input
+                  label="CGST ₹"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={cgstAmount}
+                  disabled={taxMode === 'IGST'}
+                  onChange={(e) => {
+                    setTaxManualEdit(true);
+                    setCgstAmount(e.target.value);
+                  }}
+                  className="min-w-0 [&_input]:min-w-0"
+                />
+                <Input
+                  label="SGST ₹"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={sgstAmount}
+                  disabled={taxMode === 'IGST'}
+                  onChange={(e) => {
+                    setTaxManualEdit(true);
+                    setSgstAmount(e.target.value);
+                  }}
+                  className="min-w-0 [&_input]:min-w-0"
+                />
+                <Input
+                  label="IGST ₹"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={igstAmount}
+                  disabled={taxMode === 'CGST_SGST'}
+                  onChange={(e) => {
+                    setTaxManualEdit(true);
+                    setIgstAmount(e.target.value);
+                  }}
+                  className="min-w-0 [&_input]:min-w-0"
+                />
+              </div>
+              {taxMismatch && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+                  Warning: CGST+SGST+IGST ({formatCurrency(manualTaxSum)}) differs from cart GST
+                  ({formatCurrency(cartTotals.taxAmount)}). Allowed for reconciliation — confirm before GST filing.
+                </p>
+              )}
             </div>
 
             {/* Payment Mode Selector */}
@@ -807,10 +949,23 @@ export default function BillingPage() {
                 <span>Item Level Discounts:</span>
                 <span className="font-semibold text-rose-500">-{formatCurrency(cartTotals.itemDiscountsTotal)}</span>
               </div>
-              <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
-                <span>GST (CGST/SGST or IGST):</span>
-                <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(cartTotals.taxAmount)}</span>
-              </div>
+              {taxMode === 'IGST' ? (
+                <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                  <span>IGST:</span>
+                  <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(parsedIgst)}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                    <span>CGST:</span>
+                    <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(parsedCgst)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
+                    <span>SGST:</span>
+                    <span className="font-semibold text-slate-900 dark:text-[#F1F1F1]">+{formatCurrency(parsedSgst)}</span>
+                  </div>
+                </>
+              )}
               {transportVal > 0 && (
                 <div className="flex justify-between text-slate-600 dark:text-[#9CA3AF]">
                   <span>Transport:</span>

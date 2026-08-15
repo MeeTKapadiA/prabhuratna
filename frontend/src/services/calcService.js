@@ -110,6 +110,25 @@ export function calculateCartTotals(items = [], overallDiscountPercent = 0, scra
   };
 }
 
+/** Suggest IGST when shop & customer GSTIN state codes differ. */
+export function suggestInterStateTax(shopGstin = '', customerGstin = '') {
+  const shop = String(shopGstin || '').trim().slice(0, 2);
+  const cust = String(customerGstin || '').trim().slice(0, 2);
+  if (/^\d{2}$/.test(shop) && /^\d{2}$/.test(cust) && shop !== cust) return true;
+  return false;
+}
+
+/** Split total GST into CGST/SGST halves or full IGST. */
+export function splitTaxAmount(taxAmount = 0, mode = 'CGST_SGST') {
+  const tax = Math.max(0, Math.round((parseFloat(taxAmount) || 0) * 100) / 100);
+  if (mode === 'IGST') {
+    return { cgst: 0, sgst: 0, igst: tax };
+  }
+  const half = Math.round((tax / 2) * 100) / 100;
+  const other = Math.round((tax - half) * 100) / 100;
+  return { cgst: half, sgst: other, igst: 0 };
+}
+
 /**
  * Strict Indian Currency Formatter (en-IN Locale)
  * Examples:

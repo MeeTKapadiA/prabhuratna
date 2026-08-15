@@ -170,37 +170,124 @@ function drawGstBreakdown(doc, { cgst = 0, sgst = 0, igst = 0, taxAmount = 0 }, 
   const sgstVal = parseFloat(sgst) || 0;
   const taxVal = parseFloat(taxAmount) || 0;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-
   if (igstVal > 0) {
-    doc.text('IGST:', labelX, y);
-    doc.text(formatCurrencyPDF(igstVal), rightX, y, { align: 'right' });
-    return y + 5;
+    return drawSummaryRow(doc, {
+      label: 'IGST:',
+      value: formatCurrencyPDF(igstVal),
+      y,
+      labelX,
+      rightX
+    });
   }
 
   if (cgstVal > 0 || sgstVal > 0) {
-    doc.text('CGST:', labelX, y);
-    doc.text(formatCurrencyPDF(cgstVal), rightX, y, { align: 'right' });
-    y += 5;
-    doc.text('SGST:', labelX, y);
-    doc.text(formatCurrencyPDF(sgstVal), rightX, y, { align: 'right' });
-    return y + 5;
+    y = drawSummaryRow(doc, {
+      label: 'CGST:',
+      value: formatCurrencyPDF(cgstVal),
+      y,
+      labelX,
+      rightX
+    });
+    return drawSummaryRow(doc, {
+      label: 'SGST:',
+      value: formatCurrencyPDF(sgstVal),
+      y,
+      labelX,
+      rightX
+    });
   }
 
-  // Fallback when split fields are missing (e.g. older quotations): show combined tax
   if (taxVal > 0) {
     const half = Math.round((taxVal / 2) * 100) / 100;
     const other = Math.round((taxVal - half) * 100) / 100;
-    doc.text('CGST:', labelX, y);
-    doc.text(formatCurrencyPDF(half), rightX, y, { align: 'right' });
-    y += 5;
-    doc.text('SGST:', labelX, y);
-    doc.text(formatCurrencyPDF(other), rightX, y, { align: 'right' });
-    return y + 5;
+    y = drawSummaryRow(doc, {
+      label: 'CGST:',
+      value: formatCurrencyPDF(half),
+      y,
+      labelX,
+      rightX
+    });
+    return drawSummaryRow(doc, {
+      label: 'SGST:',
+      value: formatCurrencyPDF(other),
+      y,
+      labelX,
+      rightX
+    });
   }
 
   return y;
+}
+
+/**
+ * Draw a totals-block label/value pair without overlap.
+ * Shrinks/shortens label or shifts labelX left so labelWidth + valueWidth + 5mm gap fits.
+ */
+function drawSummaryRow(doc, {
+  label,
+  value,
+  y,
+  labelX = 120,
+  rightX = 196,
+  fontSize = 8.5,
+  boldLabel = false,
+  boldValue = false,
+  valueFontSize = null
+}) {
+  const minGap = 5;
+  const shortAliases = {
+    'Total Amount After Tax:': 'Total (After Tax):',
+    'Total Amount Before Tax:': 'Total (Before Tax):',
+    'Less: Exchange/Scrap Value:': 'Less: Scrap Value:',
+    'Overall Bill Discount:': 'Bill Discount:',
+    'Transport / Freight:': 'Transport:'
+  };
+
+  let labelText = String(label || '');
+  const valueText = String(value || '');
+  const vSize = valueFontSize || (boldValue ? Math.max(fontSize, 10) : fontSize);
+
+  const measure = (text, size, bold) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    return doc.getTextWidth(text);
+  };
+
+  let labelW = measure(labelText, fontSize, boldLabel);
+  let valueW = measure(valueText, vSize, boldValue);
+  let lx = labelX;
+
+  if (labelW + valueW + minGap > rightX - lx && shortAliases[labelText]) {
+    labelText = shortAliases[labelText];
+    labelW = measure(labelText, fontSize, boldLabel);
+  }
+
+  if (labelW + valueW + minGap > rightX - lx) {
+    lx = Math.max(14, rightX - valueW - minGap - labelW);
+  }
+
+  // Final safety: if still impossible, truncate label with ellipsis
+  if (labelW + valueW + minGap > rightX - lx) {
+    const maxLabelW = Math.max(20, rightX - lx - valueW - minGap);
+    while (labelText.length > 4 && measure(labelText, fontSize, boldLabel) > maxLabelW) {
+      labelText = `${labelText.slice(0, -2)}…`;
+    }
+    labelW = measure(labelText, fontSize, boldLabel);
+    if (labelW + valueW + minGap > rightX - lx) {
+      lx = Math.max(14, rightX - valueW - minGap - labelW);
+    }
+  }
+
+  doc.setFont('helvetica', boldLabel ? 'bold' : 'normal');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(30, 41, 59);
+  doc.text(labelText, lx, y);
+
+  doc.setFont('helvetica', boldValue ? 'bold' : 'normal');
+  doc.setFontSize(vSize);
+  doc.text(valueText, rightX, y, { align: 'right' });
+
+  return y + (boldValue ? 6 : 5);
 }
 
 /** Build billed-to lines with wrapped address; returns { lines, height }. */
@@ -356,35 +443,49 @@ export function generateInvoicePDF(invoice, options = {}) {
     alternateRowStyles: { fillColor: [248, 250, 252] }
   });
 
-  // 5. Totals Breakdown — Total Before Tax → CGST/SGST or IGST → Grand Total
+  // 5. Totals Breakdown — width-safe label/value pairs (no overlap)
   let currentY = doc.lastAutoTable.finalY + 8;
   const rightX = 196;
-  const labelX = 135;
+  const labelX = 120;
 
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Total Amount Before Tax:', labelX, currentY);
-  doc.text(formatCurrencyPDF(invoice.subtotal), rightX, currentY, { align: 'right' });
-  currentY += 5;
+  currentY = drawSummaryRow(doc, {
+    label: 'Total Amount Before Tax:',
+    value: formatCurrencyPDF(invoice.subtotal),
+    y: currentY,
+    labelX,
+    rightX
+  });
 
   if (parseFloat(invoice.discount_amount) > 0) {
-    doc.text('Overall Bill Discount:', labelX, currentY);
-    doc.text(`- ${formatCurrencyPDF(invoice.discount_amount)}`, rightX, currentY, { align: 'right' });
-    currentY += 5;
+    currentY = drawSummaryRow(doc, {
+      label: 'Overall Bill Discount:',
+      value: `- ${formatCurrencyPDF(invoice.discount_amount)}`,
+      y: currentY,
+      labelX,
+      rightX
+    });
   }
 
   const scrapVal = parseFloat(invoice.scrap_value) || 0;
   if (scrapVal > 0) {
-    doc.text('Less: Exchange/Scrap Value:', labelX, currentY);
-    doc.text(`- ${formatCurrencyPDF(scrapVal)}`, rightX, currentY, { align: 'right' });
-    currentY += 5;
+    currentY = drawSummaryRow(doc, {
+      label: 'Less: Exchange/Scrap Value:',
+      value: `- ${formatCurrencyPDF(scrapVal)}`,
+      y: currentY,
+      labelX,
+      rightX
+    });
   }
 
   const transportVal = parseFloat(invoice.transport_amount) || 0;
   if (transportVal > 0) {
-    doc.text('Transport / Freight:', labelX, currentY);
-    doc.text(formatCurrencyPDF(transportVal), rightX, currentY, { align: 'right' });
-    currentY += 5;
+    currentY = drawSummaryRow(doc, {
+      label: 'Transport / Freight:',
+      value: formatCurrencyPDF(transportVal),
+      y: currentY,
+      labelX,
+      rightX
+    });
   }
 
   currentY = drawGstBreakdown(doc, {
@@ -399,10 +500,18 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.line(labelX, currentY - 1, rightX, currentY - 1);
 
   const grandTotalY = currentY + 4;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.text('Total Amount After Tax:', labelX, grandTotalY);
-  doc.text(formatCurrencyPDF(invoice.grand_total), rightX, grandTotalY, { align: 'right' });
+  // Label same size as other rows; amount bold/larger — width-checked
+  drawSummaryRow(doc, {
+    label: 'Total Amount After Tax:',
+    value: formatCurrencyPDF(invoice.grand_total),
+    y: grandTotalY,
+    labelX,
+    rightX,
+    fontSize: 8.5,
+    boldLabel: true,
+    boldValue: true,
+    valueFontSize: 10.5
+  });
 
   // 6. Terms & Conditions & Signatures
   const footerY = grandTotalY + 16;
@@ -571,18 +680,24 @@ export function generateQuotationPDF(quotation, options = {}) {
 
   let currentY = doc.lastAutoTable.finalY + 8;
   const rightX = 196;
-  const labelX = 135;
+  const labelX = 120;
 
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Total Amount Before Tax:', labelX, currentY);
-  doc.text(formatCurrencyPDF(quotation.subtotal), rightX, currentY, { align: 'right' });
-  currentY += 5;
+  currentY = drawSummaryRow(doc, {
+    label: 'Total Amount Before Tax:',
+    value: formatCurrencyPDF(quotation.subtotal),
+    y: currentY,
+    labelX,
+    rightX
+  });
 
   if (parseFloat(quotation.discount_amount) > 0) {
-    doc.text('Discount:', labelX, currentY);
-    doc.text(`- ${formatCurrencyPDF(quotation.discount_amount)}`, rightX, currentY, { align: 'right' });
-    currentY += 5;
+    currentY = drawSummaryRow(doc, {
+      label: 'Discount:',
+      value: `- ${formatCurrencyPDF(quotation.discount_amount)}`,
+      y: currentY,
+      labelX,
+      rightX
+    });
   }
 
   currentY = drawGstBreakdown(doc, {
@@ -596,10 +711,17 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.setDrawColor(203, 213, 225);
   doc.line(labelX, currentY - 1, rightX, currentY - 1);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.text('Quotation Total:', labelX, currentY + 4);
-  doc.text(formatCurrencyPDF(quotation.grand_total), rightX, currentY + 4, { align: 'right' });
+  drawSummaryRow(doc, {
+    label: 'Quotation Total:',
+    value: formatCurrencyPDF(quotation.grand_total),
+    y: currentY + 4,
+    labelX,
+    rightX,
+    fontSize: 8.5,
+    boldLabel: true,
+    boldValue: true,
+    valueFontSize: 10.5
+  });
 
   const footerY = currentY + 16;
 

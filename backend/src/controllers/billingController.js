@@ -1,10 +1,31 @@
 const db = require('../config/db');
 const { getFinancialYear } = require('../utils/fyHelper');
 const { roundMoney } = require('../utils/saleItems');
-const { processGstSaleItems, computeInvoiceTotals } = require('../utils/gst');
+const { processGstSaleItems, computeInvoiceTotals, applyManualTaxSplit, hasExplicitTaxOverride } = require('../utils/gst');
 const { auditFromReq } = require('../utils/audit');
 
 const ALLOWED_PAYMENT_MODES = new Set(['CASH', 'UPI', 'CARD', 'MIXED', 'CREDIT', 'NEFT', 'RTGS']);
+
+function getLocalDateTimeString(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/** Accept YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS] as invoice date; null → now. */
+function resolveInvoiceCreatedAt(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return getLocalDateTimeString();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${s} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  }
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2}))?/);
+  if (m) {
+    return `${m[1]} ${m[2]}:${m[3] || '00'}`;
+  }
+  return getLocalDateTimeString();
+}
 
 function getShopSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
@@ -98,7 +119,12 @@ exports.createInvoice = (req, res) => {
       amount_paid: rawAmountPaid,
       notes,
       items,
-      is_inter_state
+      is_inter_state,
+      cgst_amount: rawCgst,
+      sgst_amount: rawSgst,
+      igst_amount: rawIgst,
+      invoice_date,
+      created_at: rawCreatedAt
     } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -120,11 +146,30 @@ exports.createInvoice = (req, res) => {
       customer_address
     });
 
-    const { taxType, processedItems, finalSubtotal, finalCgst, finalSgst, finalIgst, finalTax } = processGstSaleItems(items, {
+    let { taxType, processedItems, finalSubtotal, finalCgst, finalSgst, finalIgst, finalTax } = processGstSaleItems(items, {
       shopGstin: settings.shop_gstin,
       customerGstin: customer_gstin || customer?.gstin,
       isInterState: is_inter_state
     });
+
+    // Explicit tax breakdown from Billing UI overrides auto GSTIN split
+    if (hasExplicitTaxOverride({ cgst_amount: rawCgst, sgst_amount: rawSgst, igst_amount: rawIgst })) {
+      const manual = applyManualTaxSplit(processedItems, {
+        cgst: rawCgst,
+        sgst: rawSgst,
+        igst: rawIgst
+      });
+      taxType = manual.taxType;
+      processedItems = manual.processedItems;
+      finalCgst = manual.finalCgst;
+      finalSgst = manual.finalSgst;
+      finalIgst = manual.finalIgst;
+      finalTax = manual.finalTax;
+    } else if (typeof is_inter_state === 'boolean') {
+      // Force split type via toggle without custom amounts — already handled in processGstSaleItems
+    }
+
+    const invoiceCreatedAt = resolveInvoiceCreatedAt(invoice_date || rawCreatedAt);
 
     const requestedDiscount = Math.max(0, Number.parseFloat(rawDiscountAmount) || 0);
     const finalDiscount = roundMoney(Math.min(requestedDiscount, finalSubtotal + finalTax));
@@ -185,7 +230,7 @@ exports.createInvoice = (req, res) => {
           place_of_supply, po_number, subtotal, tax_amount, cgst_amount, sgst_amount, igst_amount, tax_type,
           discount_amount, scrap_value, transport_amount, round_off, grand_total,
           payment_mode, amount_paid, balance_due, payment_status, status, notes, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, datetime('now', 'localtime'))
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
       `);
 
       const result = invoiceStmt.run(
@@ -215,7 +260,8 @@ exports.createInvoice = (req, res) => {
         balanceDue,
         paymentStatus,
         notes || '',
-        req.user?.id || null
+        req.user?.id || null,
+        invoiceCreatedAt
       );
 
       const invoiceId = result.lastInsertRowid;

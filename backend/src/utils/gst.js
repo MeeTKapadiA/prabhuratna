@@ -114,10 +114,82 @@ function computeInvoiceTotals({
   return { beforeRound, round_off: appliedRoundOff, grand_total: grandTotal };
 }
 
+/**
+ * Apply invoice-level CGST/SGST/IGST overrides and redistribute proportionally onto items.
+ * Used when the client supplies explicit tax amounts from the Billing UI.
+ */
+function applyManualTaxSplit(processedItems = [], { cgst, sgst, igst } = {}) {
+  const finalCgst = roundMoney(Math.max(0, Number.parseFloat(cgst) || 0));
+  const finalSgst = roundMoney(Math.max(0, Number.parseFloat(sgst) || 0));
+  const finalIgst = roundMoney(Math.max(0, Number.parseFloat(igst) || 0));
+  const finalTax = roundMoney(finalCgst + finalSgst + finalIgst);
+  const taxType = finalIgst > 0 && finalCgst === 0 && finalSgst === 0 ? 'IGST' : 'CGST_SGST';
+
+  const totalTaxable = processedItems.reduce((sum, item) => sum + (Number(item.taxable_value) || 0), 0);
+  if (!processedItems.length) {
+    return { taxType, processedItems, finalCgst, finalSgst, finalIgst, finalTax };
+  }
+
+  let allocatedCgst = 0;
+  let allocatedSgst = 0;
+  let allocatedIgst = 0;
+
+  const scaled = processedItems.map((item, idx) => {
+    const isLast = idx === processedItems.length - 1;
+    const share = totalTaxable > 0 ? (Number(item.taxable_value) || 0) / totalTaxable : 1 / processedItems.length;
+
+    let itemCgst;
+    let itemSgst;
+    let itemIgst;
+    if (isLast) {
+      itemCgst = roundMoney(finalCgst - allocatedCgst);
+      itemSgst = roundMoney(finalSgst - allocatedSgst);
+      itemIgst = roundMoney(finalIgst - allocatedIgst);
+    } else {
+      itemCgst = roundMoney(finalCgst * share);
+      itemSgst = roundMoney(finalSgst * share);
+      itemIgst = roundMoney(finalIgst * share);
+      allocatedCgst = roundMoney(allocatedCgst + itemCgst);
+      allocatedSgst = roundMoney(allocatedSgst + itemSgst);
+      allocatedIgst = roundMoney(allocatedIgst + itemIgst);
+    }
+
+    const itemTax = roundMoney(itemCgst + itemSgst + itemIgst);
+    return {
+      ...item,
+      cgst_amount: itemCgst,
+      sgst_amount: itemSgst,
+      igst_amount: itemIgst,
+      total_price: roundMoney((Number(item.taxable_value) || 0) + itemTax)
+    };
+  });
+
+  return {
+    taxType,
+    processedItems: scaled,
+    finalCgst,
+    finalSgst,
+    finalIgst,
+    finalTax
+  };
+}
+
+function hasExplicitTaxOverride(body = {}) {
+  return (
+    body.cgst_amount !== undefined && body.cgst_amount !== null && body.cgst_amount !== ''
+  ) || (
+    body.sgst_amount !== undefined && body.sgst_amount !== null && body.sgst_amount !== ''
+  ) || (
+    body.igst_amount !== undefined && body.igst_amount !== null && body.igst_amount !== ''
+  );
+}
+
 module.exports = {
   extractStateCode,
   resolveTaxSplit,
   splitGst,
   processGstSaleItems,
-  computeInvoiceTotals
+  computeInvoiceTotals,
+  applyManualTaxSplit,
+  hasExplicitTaxOverride
 };
