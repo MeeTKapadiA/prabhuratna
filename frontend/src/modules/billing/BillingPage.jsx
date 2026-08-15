@@ -42,6 +42,9 @@ export default function BillingPage() {
   const [customerGstin, setCustomerGstin] = useState('');
   const [customerPan, setCustomerPan] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [poNumber, setPoNumber] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [suggestedInvoiceNumber, setSuggestedInvoiceNumber] = useState('');
   const [paymentMode, setPaymentMode] = useState('CASH');
   const [amountPaid, setAmountPaid] = useState('');
   const [overallDiscount, setOverallDiscount] = useState(0);
@@ -68,6 +71,19 @@ export default function BillingPage() {
 
   useEffect(() => {
     refreshSettings().catch(() => setApiDown(true));
+
+    const loadNextInvoiceNumber = async () => {
+      try {
+        const res = await apiRequest('/billing/next-invoice-number');
+        if (res.success && res.invoice_number) {
+          setSuggestedInvoiceNumber(res.invoice_number);
+          setInvoiceNumber(res.invoice_number);
+        }
+      } catch (_) {
+        /* non-fatal — staff can still type a number */
+      }
+    };
+    loadNextInvoiceNumber();
 
     if (isOnline()) {
       flushQueue(apiRequest).then((result) => {
@@ -242,6 +258,14 @@ export default function BillingPage() {
         ? (paymentMode === 'CREDIT' ? 0 : displayGrand)
         : Math.max(0, parseFloat(amountPaid) || 0);
 
+      const trimmedInvoiceNo = String(invoiceNumber || '').trim();
+      // Blank or still the auto-suggestion → server bumps sequential counter.
+      // Only a manually edited number is sent as an override (no counter bump).
+      const invoiceNumberOverride =
+        trimmedInvoiceNo && trimmedInvoiceNo !== suggestedInvoiceNumber
+          ? trimmedInvoiceNo
+          : '';
+
       const payload = {
         customer_name: customerName,
         customer_phone: customerPhone,
@@ -249,17 +273,20 @@ export default function BillingPage() {
         customer_gstin: customerGstin,
         customer_pan: customerPan,
         customer_address: customerAddress,
+        po_number: poNumber,
+        invoice_number: invoiceNumberOverride,
         payment_mode: paymentMode,
         amount_paid: paid,
         discount_amount: cartTotals.billDiscountAmount,
         scrap_value: cartTotals.scrapValue,
         transport_amount: transportVal,
+        round_off: 0,
         notes,
         items: cartItems.map((item) => ({
           product_id: item.is_custom ? null : (item.product_id || item.id || null),
           product_name: item.product_name || item.name,
           barcode: item.barcode || '',
-          hsn_sac: item.hsn_sac || '',
+          hsn_sac: item.hsn_sac || item.hsn_code || '',
           unit: item.unit || 'pcs',
           size_variant: item.size_variant || '',
           gauge: item.gauge || '',
@@ -290,12 +317,23 @@ export default function BillingPage() {
         setCustomerGstin('');
         setCustomerPan('');
         setCustomerAddress('');
+        setPoNumber('');
         setOverallDiscount(0);
         setScrapValue(0);
         setTransportAmount(0);
         setAmountPaid('');
         setNotes('');
         setApiDown(false);
+        try {
+          const nextRes = await apiRequest('/billing/next-invoice-number');
+          if (nextRes.success && nextRes.invoice_number) {
+            setSuggestedInvoiceNumber(nextRes.invoice_number);
+            setInvoiceNumber(nextRes.invoice_number);
+          }
+        } catch (_) {
+          setSuggestedInvoiceNumber('');
+          setInvoiceNumber('');
+        }
         if (res.low_stock_alerts?.length) {
           showToast(`${res.low_stock_alerts.length} product(s) are low on stock`, 'warning');
         } else {
@@ -311,17 +349,24 @@ export default function BillingPage() {
           customer_gstin: customerGstin,
           customer_pan: customerPan,
           customer_address: customerAddress,
+          po_number: poNumber,
+          invoice_number:
+            String(invoiceNumber || '').trim() &&
+            String(invoiceNumber || '').trim() !== suggestedInvoiceNumber
+              ? String(invoiceNumber).trim()
+              : '',
           payment_mode: paymentMode,
           amount_paid: paymentMode === 'CREDIT' ? 0 : displayGrand,
           discount_amount: cartTotals.billDiscountAmount,
           scrap_value: cartTotals.scrapValue,
           transport_amount: transportVal,
+          round_off: 0,
           notes,
           items: cartItems.map((item) => ({
             product_id: item.is_custom ? null : (item.product_id || null),
             product_name: item.product_name,
             barcode: item.barcode || '',
-            hsn_sac: item.hsn_sac || '',
+            hsn_sac: item.hsn_sac || item.hsn_code || '',
             unit: item.unit || 'pcs',
             unit_price: parseFloat(item.unit_price) || 0,
             quantity: parseFloat(item.quantity) || 1,
@@ -658,6 +703,23 @@ export default function BillingPage() {
                 className="min-w-0"
                 rows={2}
               />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Invoice Number"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  placeholder="Auto or paper bill no."
+                  className="min-w-0"
+                />
+                <Input
+                  label="PO Number"
+                  value={poNumber}
+                  onChange={(e) => setPoNumber(e.target.value)}
+                  placeholder="Optional PO / Order No."
+                  className="min-w-0"
+                />
+              </div>
 
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 <div className="min-w-0">

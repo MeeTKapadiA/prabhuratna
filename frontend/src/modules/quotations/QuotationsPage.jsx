@@ -31,6 +31,7 @@ export default function QuotationsPage() {
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
   const [customerPan, setCustomerPan] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [validDays, setValidDays] = useState('15');
   const [notes, setNotes] = useState('');
 
@@ -94,6 +95,7 @@ export default function QuotationsPage() {
     setCustomerAddress('');
     setCustomerGstin('');
     setCustomerPan('');
+    setPoNumber('');
     setValidDays('15');
     setNotes('');
     setProdSearch('');
@@ -148,6 +150,7 @@ export default function QuotationsPage() {
         customer_address: customerAddress,
         customer_gstin: customerGstin,
         customer_pan: customerPan,
+        po_number: poNumber,
         notes,
         valid_until: validUntilLocal,
         items: qtnItems
@@ -374,6 +377,13 @@ export default function QuotationsPage() {
               placeholder="AAAAA0000A"
             />
           </div>
+
+          <Input
+            label="PO Number"
+            value={poNumber}
+            onChange={(e) => setPoNumber(e.target.value)}
+            placeholder="Optional PO / Order No."
+          />
 
           {/* Product Search and Select */}
           <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-[#2D3138]">

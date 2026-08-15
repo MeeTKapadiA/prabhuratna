@@ -11,6 +11,7 @@ exports.createQuotation = (req, res) => {
       customer_address,
       customer_gstin,
       customer_pan,
+      po_number,
       discount_amount,
       notes,
       valid_until,
@@ -52,9 +53,9 @@ exports.createQuotation = (req, res) => {
       const qtnStmt = db.prepare(`
         INSERT INTO quotations (
           quotation_number, customer_name, customer_phone, customer_email, customer_address,
-          customer_gstin, customer_pan,
+          customer_gstin, customer_pan, po_number,
           subtotal, tax_amount, discount_amount, grand_total, notes, valid_until, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
       `);
 
       const result = qtnStmt.run(
@@ -65,6 +66,7 @@ exports.createQuotation = (req, res) => {
         customer_address || '',
         customer_gstin || '',
         customer_pan || '',
+        String(po_number || '').trim(),
         finalSubtotal,
         finalTax,
         finalDiscount,

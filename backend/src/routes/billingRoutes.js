@@ -3,6 +3,9 @@ const router = express.Router();
 const billingController = require('../controllers/billingController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
+// Must be registered before /:id routes
+router.get('/next-invoice-number', authenticateToken, billingController.getNextInvoiceNumber);
+
 router.post('/invoices', authenticateToken, billingController.createInvoice);
 router.get('/invoices', authenticateToken, billingController.getAllInvoices);
 router.get('/invoices/:id', authenticateToken, billingController.getInvoiceById);

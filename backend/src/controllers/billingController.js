@@ -88,6 +88,8 @@ exports.createInvoice = (req, res) => {
       customer_pan,
       customer_address,
       place_of_supply,
+      po_number,
+      invoice_number: requestedInvoiceNumber,
       discount_amount: rawDiscountAmount,
       scrap_value: rawScrapValue,
       transport_amount: rawTransport,
@@ -154,22 +156,36 @@ exports.createInvoice = (req, res) => {
 
     const transaction = db.transaction(() => {
       const fy = getFinancialYear();
-      db.prepare(`
-        INSERT INTO invoice_counters (financial_year, last_number)
-        VALUES (?, 0)
-        ON CONFLICT(financial_year) DO NOTHING
-      `).run(fy);
-      db.prepare(`UPDATE invoice_counters SET last_number = last_number + 1 WHERE financial_year = ?`).run(fy);
-      const counterRow = db.prepare('SELECT last_number FROM invoice_counters WHERE financial_year = ?').get(fy);
-      const invoiceNumber = `INV/${fy}/${String(counterRow.last_number).padStart(4, '0')}`;
+      const manualNumber = String(requestedInvoiceNumber || '').trim();
+      let invoiceNumber;
+
+      if (manualNumber) {
+        const dup = db.prepare('SELECT id FROM invoices WHERE invoice_number = ?').get(manualNumber);
+        if (dup) {
+          const error = new Error(`Invoice number "${manualNumber}" is already used. Choose a different number.`);
+          error.statusCode = 400;
+          throw error;
+        }
+        // Manual override — do not bump the sequential counter
+        invoiceNumber = manualNumber;
+      } else {
+        db.prepare(`
+          INSERT INTO invoice_counters (financial_year, last_number)
+          VALUES (?, 0)
+          ON CONFLICT(financial_year) DO NOTHING
+        `).run(fy);
+        db.prepare(`UPDATE invoice_counters SET last_number = last_number + 1 WHERE financial_year = ?`).run(fy);
+        const counterRow = db.prepare('SELECT last_number FROM invoice_counters WHERE financial_year = ?').get(fy);
+        invoiceNumber = `INV/${fy}/${String(counterRow.last_number).padStart(4, '0')}`;
+      }
 
       const invoiceStmt = db.prepare(`
         INSERT INTO invoices (
           invoice_number, customer_id, customer_name, customer_phone, customer_email, customer_gstin, customer_pan, customer_address,
-          place_of_supply, subtotal, tax_amount, cgst_amount, sgst_amount, igst_amount, tax_type,
+          place_of_supply, po_number, subtotal, tax_amount, cgst_amount, sgst_amount, igst_amount, tax_type,
           discount_amount, scrap_value, transport_amount, round_off, grand_total,
           payment_mode, amount_paid, balance_due, payment_status, status, notes, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, datetime('now', 'localtime'))
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, datetime('now', 'localtime'))
       `);
 
       const result = invoiceStmt.run(
@@ -182,6 +198,7 @@ exports.createInvoice = (req, res) => {
         customer_pan || '',
         customer_address || customer?.address || '',
         place_of_supply || '',
+        String(po_number || '').trim(),
         finalSubtotal,
         finalTax,
         finalCgst,
@@ -287,6 +304,30 @@ exports.createInvoice = (req, res) => {
       success: false,
       message: error.statusCode === 400 ? error.message : 'Failed to create invoice'
     });
+  }
+};
+
+/** Peek next sequential invoice number without incrementing the counter. */
+exports.getNextInvoiceNumber = (req, res) => {
+  try {
+    const fy = getFinancialYear();
+    db.prepare(`
+      INSERT INTO invoice_counters (financial_year, last_number)
+      VALUES (?, 0)
+      ON CONFLICT(financial_year) DO NOTHING
+    `).run(fy);
+    const row = db.prepare('SELECT last_number FROM invoice_counters WHERE financial_year = ?').get(fy);
+    const next = (row?.last_number || 0) + 1;
+    const invoice_number = `INV/${fy}/${String(next).padStart(4, '0')}`;
+    return res.json({
+      success: true,
+      invoice_number,
+      financial_year: fy,
+      next_sequence: next
+    });
+  } catch (error) {
+    console.error('Error fetching next invoice number:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch next invoice number' });
   }
 };
 

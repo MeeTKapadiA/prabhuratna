@@ -384,6 +384,7 @@ function initDb() {
   runMigration(`ALTER TABLE invoices ADD COLUMN created_by INTEGER`);
   runMigration(`ALTER TABLE invoices ADD COLUMN cancelled_at DATETIME`);
   runMigration(`ALTER TABLE invoices ADD COLUMN cancel_reason TEXT`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN po_number TEXT DEFAULT ''`);
 
   runMigration(`ALTER TABLE invoice_items ADD COLUMN hsn_sac TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE invoice_items ADD COLUMN unit TEXT DEFAULT 'pcs'`);
@@ -397,6 +398,7 @@ function initDb() {
 
   runMigration(`ALTER TABLE quotations ADD COLUMN customer_gstin TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE quotations ADD COLUMN customer_pan TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE quotations ADD COLUMN po_number TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE quotation_items ADD COLUMN hsn_sac TEXT DEFAULT ''`);
 
   runMigration(`ALTER TABLE returns ADD COLUMN credit_note_id INTEGER`);
@@ -678,6 +680,55 @@ function initDb() {
 
     for (const p of sampleProducts) {
       insertProd.run(...p);
+    }
+  }
+
+  // Reference catalog from client's physical tax invoice (idempotent by product name).
+  // Owner should verify purchase_price (estimated at 75% of rate), stock_quantity, and category after go-live.
+  const referenceInvoiceProducts = [
+    { name: 'S.S. Cutlery Set with GoldLine', hsn: '39249096', gst: 18, rate: 2300, unit: 'pcs', category: 'Kitchenware', brand: 'Prabhuratna', sku: 'SKU-REF-CUTLERY-GL' },
+    { name: 'Ocean Water Glass', hsn: '70132100', gst: 18, rate: 465, unit: 'pcs', category: 'Glassware', brand: 'Ocean', sku: 'SKU-REF-OCEAN-WG' },
+    { name: 'Ocean Juice Glass', hsn: '70132100', gst: 18, rate: 485, unit: 'pcs', category: 'Glassware', brand: 'Ocean', sku: 'SKU-REF-OCEAN-JG' },
+    { name: 'S.S. Tea Thermos 2 Ltr', hsn: '96170012', gst: 18, rate: 1640, unit: 'pcs', category: 'Kitchenware', brand: 'Prabhuratna', sku: 'SKU-REF-THERMOS-2L' },
+    { name: 'Hawkins Single Induction', hsn: '85167100', gst: 18, rate: 3720, unit: 'pcs', category: 'Appliances', brand: 'Hawkins', sku: 'SKU-REF-HAWK-IND' },
+    { name: 'S.S. Top Big Heavy Duty', hsn: '73239190', gst: 5, rate: 3125, unit: 'pcs', category: 'Cookware', brand: 'Prabhuratna', sku: 'SKU-REF-SSTOP-BIG' },
+    { name: 'Milton Tea Coaster Big', hsn: '39249090', gst: 18, rate: 186, unit: 'pcs', category: 'Kitchenware', brand: 'Milton', sku: 'SKU-REF-MILTON-TCB' },
+    { name: 'Milton Tea Coaster Medium', hsn: '39249090', gst: 18, rate: 156, unit: 'pcs', category: 'Kitchenware', brand: 'Milton', sku: 'SKU-REF-MILTON-TCM' },
+    { name: 'S.S. Sandwich Bottom Top with Cover', hsn: '73239190', gst: 5, rate: 735, unit: 'pcs', category: 'Cookware', brand: 'Prabhuratna', sku: 'SKU-REF-SS-SAND' },
+    { name: 'Melamine Serving Spoon', hsn: '39249090', gst: 18, rate: 170, unit: 'pcs', category: 'Kitchenware', brand: 'Prabhuratna', sku: 'SKU-REF-MEL-SPOON' },
+    { name: 'Dabbo Heavy', hsn: '39249090', gst: 18, rate: 245, unit: 'pcs', category: 'Kitchenware', brand: 'Prabhuratna', sku: 'SKU-REF-DABBO-HVY' },
+    { name: 'S.S. Laddle for Dal - Heavy', hsn: '39249090', gst: 18, rate: 235, unit: 'pcs', category: 'Kitchenware', brand: 'Prabhuratna', sku: 'SKU-REF-SS-LADDLE' },
+    { name: 'Cup Saucer', hsn: '69111011', gst: 5, rate: 2440, unit: 'pcs', category: 'Dinnerware', brand: 'Prabhuratna', sku: 'SKU-REF-CUP-SAUCER' },
+    { name: 'Copper Pooja Plate', hsn: '73239190', gst: 5, rate: 245, unit: 'pcs', category: 'Pooja Items', brand: 'Prabhuratna', sku: 'SKU-REF-CU-POOJA' }
+  ];
+
+  const findRefProduct = db.prepare('SELECT id FROM products WHERE name = ?');
+  const insertRefProduct = db.prepare(`
+    INSERT INTO products
+      (name, barcode, sku, category, brand, purchase_price, selling_price, discount_percent,
+       gst_percent, stock_quantity, min_stock_level, hsn_code, hsn_sac, unit, show_on_website)
+    VALUES (?, NULL, ?, ?, ?, ?, ?, 0, ?, 10, 3, ?, ?, ?, 0)
+  `);
+
+  for (const p of referenceInvoiceProducts) {
+    if (findRefProduct.get(p.name)) continue;
+    const purchaseEstimate = Math.round(p.rate * 0.75 * 100) / 100;
+    try {
+      insertRefProduct.run(
+        p.name,
+        p.sku,
+        p.category,
+        p.brand,
+        purchaseEstimate,
+        p.rate,
+        p.gst,
+        p.hsn,
+        p.hsn,
+        p.unit
+      );
+    } catch (err) {
+      // Skip if SKU collision on a renamed row — never wipe existing catalog
+      console.warn(`[seed] Skipped reference product "${p.name}":`, err.message);
     }
   }
 }

@@ -150,15 +150,84 @@ function drawBankDetails(doc, settings, startY) {
 /**
  * PDF-specific currency formatter using 'Rs. ' prefix instead of '₹'
  * to avoid broken character glyphs in jsPDF default Helvetica font.
+ * Always shows 2 decimal places (paise) to match physical tax invoices.
  */
-export function formatCurrencyPDF(amount = 0, showDecimals = false) {
+export function formatCurrencyPDF(amount = 0) {
   const num = parseFloat(amount) || 0;
   const formatted = new Intl.NumberFormat('en-IN', {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: num % 1 === 0 ? 0 : 2
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(num);
 
   return `Rs. ${formatted}`;
+}
+
+/** Draw CGST/SGST or IGST rows; returns next Y. */
+function drawGstBreakdown(doc, { cgst = 0, sgst = 0, igst = 0, taxAmount = 0 }, labelX, rightX, startY) {
+  let y = startY;
+  const igstVal = parseFloat(igst) || 0;
+  const cgstVal = parseFloat(cgst) || 0;
+  const sgstVal = parseFloat(sgst) || 0;
+  const taxVal = parseFloat(taxAmount) || 0;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+
+  if (igstVal > 0) {
+    doc.text('IGST:', labelX, y);
+    doc.text(formatCurrencyPDF(igstVal), rightX, y, { align: 'right' });
+    return y + 5;
+  }
+
+  if (cgstVal > 0 || sgstVal > 0) {
+    doc.text('CGST:', labelX, y);
+    doc.text(formatCurrencyPDF(cgstVal), rightX, y, { align: 'right' });
+    y += 5;
+    doc.text('SGST:', labelX, y);
+    doc.text(formatCurrencyPDF(sgstVal), rightX, y, { align: 'right' });
+    return y + 5;
+  }
+
+  // Fallback when split fields are missing (e.g. older quotations): show combined tax
+  if (taxVal > 0) {
+    const half = Math.round((taxVal / 2) * 100) / 100;
+    const other = Math.round((taxVal - half) * 100) / 100;
+    doc.text('CGST:', labelX, y);
+    doc.text(formatCurrencyPDF(half), rightX, y, { align: 'right' });
+    y += 5;
+    doc.text('SGST:', labelX, y);
+    doc.text(formatCurrencyPDF(other), rightX, y, { align: 'right' });
+    return y + 5;
+  }
+
+  return y;
+}
+
+/** Build billed-to lines with wrapped address; returns { lines, height }. */
+function buildCustomerBoxLines(doc, {
+  titlePrefix = 'Customer',
+  name,
+  phone,
+  email,
+  address,
+  gstin,
+  pan
+}) {
+  const maxWidth = 174;
+  const lines = [`${titlePrefix}: ${name || 'Walk-in Customer'}`];
+  if (phone || email) {
+    lines.push(`Phone: ${phone || 'N/A'}${email ? `  |  Email: ${email}` : ''}`);
+  } else {
+    lines.push(`Phone: ${phone || 'N/A'}`);
+  }
+  const addr = String(address || '').trim();
+  if (addr) {
+    const wrapped = doc.splitTextToSize(`Address: ${addr}`, maxWidth);
+    wrapped.forEach((w) => lines.push(w));
+  }
+  if (gstin) lines.push(`GSTIN: ${gstin}`);
+  if (pan) lines.push(`PAN: ${pan}`);
+  return lines;
 }
 
 export function generateInvoicePDF(invoice, options = {}) {
@@ -192,28 +261,38 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.text('TAX INVOICE', 196, 16, { align: 'right' });
 
   // 2. Company Details & Invoice Metadata (address wraps; no overlap with right meta)
+  const metaRows = [
+    { label: 'Invoice No:', value: invoice.invoice_number || '' },
+    { label: 'Date:', value: formatDate(invoice.created_at || new Date()) }
+  ];
+  if (String(invoice.po_number || '').trim()) {
+    metaRows.push({ label: 'PO Number:', value: String(invoice.po_number).trim() });
+  }
+  metaRows.push({ label: 'Payment Mode:', value: invoice.payment_mode || 'Cash' });
+
   const afterHeaderY = drawShopHeaderBlock(doc, {
     shopName,
     shopAddress,
     shopGstin,
     shopPhone,
     shopEmail,
-    metaRows: [
-      { label: 'Invoice No:', value: invoice.invoice_number || '' },
-      { label: 'Date:', value: formatDate(invoice.created_at || new Date()) },
-      { label: 'Payment Mode:', value: invoice.payment_mode || 'Cash' }
-    ]
+    metaRows
   });
 
-  // 3. Customer Info Box (GSTIN / PAN only when filled)
+  // 3. Customer Info Box (address + GSTIN / PAN when filled)
   const customerGstin = (invoice.customer_gstin || '').trim();
   const customerPan = (invoice.customer_pan || '').trim();
-  const billedLines = [
-    `Customer: ${invoice.customer_name || 'Walk-in Customer'}`,
-    `Phone: ${invoice.customer_phone || 'N/A'}`
-  ];
-  if (customerGstin) billedLines.push(`GSTIN: ${customerGstin}`);
-  if (customerPan) billedLines.push(`PAN: ${customerPan}`);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const billedLines = buildCustomerBoxLines(doc, {
+    titlePrefix: 'Customer',
+    name: invoice.customer_name,
+    phone: invoice.customer_phone,
+    email: invoice.customer_email,
+    address: invoice.customer_address,
+    gstin: customerGstin,
+    pan: customerPan
+  });
 
   const boxHeight = 14 + billedLines.length * 5;
   doc.setDrawColor(226, 232, 240);
@@ -277,19 +356,15 @@ export function generateInvoicePDF(invoice, options = {}) {
     alternateRowStyles: { fillColor: [248, 250, 252] }
   });
 
-  // 5. Totals Breakdown
+  // 5. Totals Breakdown — Total Before Tax → CGST/SGST or IGST → Grand Total
   let currentY = doc.lastAutoTable.finalY + 8;
   const rightX = 196;
   const labelX = 135;
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('Subtotal:', labelX, currentY);
+  doc.text('Total Amount Before Tax:', labelX, currentY);
   doc.text(formatCurrencyPDF(invoice.subtotal), rightX, currentY, { align: 'right' });
-  currentY += 5;
-
-  doc.text('Tax (GST Total):', labelX, currentY);
-  doc.text(formatCurrencyPDF(invoice.tax_amount), rightX, currentY, { align: 'right' });
   currentY += 5;
 
   if (parseFloat(invoice.discount_amount) > 0) {
@@ -305,6 +380,20 @@ export function generateInvoicePDF(invoice, options = {}) {
     currentY += 5;
   }
 
+  const transportVal = parseFloat(invoice.transport_amount) || 0;
+  if (transportVal > 0) {
+    doc.text('Transport / Freight:', labelX, currentY);
+    doc.text(formatCurrencyPDF(transportVal), rightX, currentY, { align: 'right' });
+    currentY += 5;
+  }
+
+  currentY = drawGstBreakdown(doc, {
+    cgst: invoice.cgst_amount,
+    sgst: invoice.sgst_amount,
+    igst: invoice.igst_amount,
+    taxAmount: invoice.tax_amount
+  }, labelX, rightX, currentY);
+
   doc.setLineWidth(0.4);
   doc.setDrawColor(203, 213, 225);
   doc.line(labelX, currentY - 1, rightX, currentY - 1);
@@ -312,7 +401,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   const grandTotalY = currentY + 4;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.text('Grand Total:', labelX, grandTotalY);
+  doc.text('Total Amount After Tax:', labelX, grandTotalY);
   doc.text(formatCurrencyPDF(invoice.grand_total), rightX, grandTotalY, { align: 'right' });
 
   // 6. Terms & Conditions & Signatures
@@ -389,6 +478,9 @@ export function generateQuotationPDF(quotation, options = {}) {
     { label: 'Quotation No:', value: quotation.quotation_number || '' },
     { label: 'Date:', value: formatDate(quotation.created_at || new Date()) }
   ];
+  if (String(quotation.po_number || '').trim()) {
+    metaRows.push({ label: 'PO Number:', value: String(quotation.po_number).trim() });
+  }
   if (quotation.valid_until) {
     metaRows.push({ label: 'Valid Until:', value: formatDate(quotation.valid_until) });
   }
@@ -404,12 +496,17 @@ export function generateQuotationPDF(quotation, options = {}) {
 
   const customerGstin = (quotation.customer_gstin || '').trim();
   const customerPan = (quotation.customer_pan || '').trim();
-  const quoteLines = [
-    `Company / Client: ${quotation.customer_name}`,
-    `Phone: ${quotation.customer_phone || 'N/A'}  |  Email: ${quotation.customer_email || 'N/A'}`
-  ];
-  if (customerGstin) quoteLines.push(`GSTIN: ${customerGstin}`);
-  if (customerPan) quoteLines.push(`PAN: ${customerPan}`);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const quoteLines = buildCustomerBoxLines(doc, {
+    titlePrefix: 'Company / Client',
+    name: quotation.customer_name,
+    phone: quotation.customer_phone,
+    email: quotation.customer_email,
+    address: quotation.customer_address,
+    gstin: customerGstin,
+    pan: customerPan
+  });
 
   const boxHeight = 14 + quoteLines.length * 5;
   doc.setDrawColor(226, 232, 240);
@@ -472,28 +569,39 @@ export function generateQuotationPDF(quotation, options = {}) {
     alternateRowStyles: { fillColor: [248, 250, 252] }
   });
 
-  const finalY = doc.lastAutoTable.finalY + 8;
+  let currentY = doc.lastAutoTable.finalY + 8;
   const rightX = 196;
   const labelX = 135;
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('Subtotal:', labelX, finalY);
-  doc.text(formatCurrencyPDF(quotation.subtotal), rightX, finalY, { align: 'right' });
+  doc.text('Total Amount Before Tax:', labelX, currentY);
+  doc.text(formatCurrencyPDF(quotation.subtotal), rightX, currentY, { align: 'right' });
+  currentY += 5;
 
-  doc.text('Estimated GST:', labelX, finalY + 5);
-  doc.text(formatCurrencyPDF(quotation.tax_amount), rightX, finalY + 5, { align: 'right' });
+  if (parseFloat(quotation.discount_amount) > 0) {
+    doc.text('Discount:', labelX, currentY);
+    doc.text(`- ${formatCurrencyPDF(quotation.discount_amount)}`, rightX, currentY, { align: 'right' });
+    currentY += 5;
+  }
+
+  currentY = drawGstBreakdown(doc, {
+    cgst: quotation.cgst_amount,
+    sgst: quotation.sgst_amount,
+    igst: quotation.igst_amount,
+    taxAmount: quotation.tax_amount
+  }, labelX, rightX, currentY);
 
   doc.setLineWidth(0.4);
   doc.setDrawColor(203, 213, 225);
-  doc.line(labelX, finalY + 9, rightX, finalY + 9);
+  doc.line(labelX, currentY - 1, rightX, currentY - 1);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.text('Quotation Total:', labelX, finalY + 15);
-  doc.text(formatCurrencyPDF(quotation.grand_total), rightX, finalY + 15, { align: 'right' });
+  doc.text('Quotation Total:', labelX, currentY + 4);
+  doc.text(formatCurrencyPDF(quotation.grand_total), rightX, currentY + 4, { align: 'right' });
 
-  const footerY = finalY + 24;
+  const footerY = currentY + 16;
 
   if (quotation.notes) {
     doc.setFontSize(8);
