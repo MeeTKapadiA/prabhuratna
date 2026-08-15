@@ -110,6 +110,7 @@ exports.createInvoice = (req, res) => {
       customer_address,
       place_of_supply,
       po_number,
+      bill_type,
       invoice_number: requestedInvoiceNumber,
       discount_amount: rawDiscountAmount,
       scrap_value: rawScrapValue,
@@ -129,6 +130,16 @@ exports.createInvoice = (req, res) => {
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Cart items are required to generate invoice' });
+    }
+
+    const isCommercial = String(bill_type || '').toLowerCase() === 'commercial';
+    const finalBillType = isCommercial ? 'commercial' : 'customer';
+
+    if (isCommercial && Array.isArray(items)) {
+      for (const item of items) {
+        item.discount_percent = 0;
+        item.discount_amount = 0;
+      }
     }
 
     const normalizedPaymentMode = String(payment_mode || '').toUpperCase();
@@ -152,6 +163,13 @@ exports.createInvoice = (req, res) => {
       isInterState: is_inter_state
     });
 
+    if (isCommercial && Array.isArray(processedItems)) {
+      for (const item of processedItems) {
+        item.discount_percent = 0;
+        item.discount_amount = 0;
+      }
+    }
+
     // Explicit tax breakdown from Billing UI overrides auto GSTIN split
     if (hasExplicitTaxOverride({ cgst_amount: rawCgst, sgst_amount: rawSgst, igst_amount: rawIgst })) {
       const manual = applyManualTaxSplit(processedItems, {
@@ -171,8 +189,8 @@ exports.createInvoice = (req, res) => {
 
     const invoiceCreatedAt = resolveInvoiceCreatedAt(invoice_date || rawCreatedAt);
 
-    const requestedDiscount = Math.max(0, Number.parseFloat(rawDiscountAmount) || 0);
-    const finalDiscount = roundMoney(Math.min(requestedDiscount, finalSubtotal + finalTax));
+    const requestedDiscount = isCommercial ? 0 : Math.max(0, Number.parseFloat(rawDiscountAmount) || 0);
+    const finalDiscount = isCommercial ? 0 : roundMoney(Math.min(requestedDiscount, finalSubtotal + finalTax));
     const finalScrap = roundMoney(Math.max(0, Number.parseFloat(rawScrapValue) || 0));
     const finalTransport = roundMoney(Math.max(0, Number.parseFloat(rawTransport) || 0));
     const { round_off: finalRoundOff, grand_total: finalGrandTotal } = computeInvoiceTotals({
@@ -227,10 +245,10 @@ exports.createInvoice = (req, res) => {
       const invoiceStmt = db.prepare(`
         INSERT INTO invoices (
           invoice_number, customer_id, customer_name, customer_phone, customer_email, customer_gstin, customer_pan, customer_address,
-          place_of_supply, po_number, subtotal, tax_amount, cgst_amount, sgst_amount, igst_amount, tax_type,
+          place_of_supply, po_number, bill_type, subtotal, tax_amount, cgst_amount, sgst_amount, igst_amount, tax_type,
           discount_amount, scrap_value, transport_amount, round_off, grand_total,
           payment_mode, amount_paid, balance_due, payment_status, status, notes, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
       `);
 
       const result = invoiceStmt.run(
@@ -244,6 +262,7 @@ exports.createInvoice = (req, res) => {
         customer_address || customer?.address || '',
         place_of_supply || '',
         String(po_number || '').trim(),
+        finalBillType,
         finalSubtotal,
         finalTax,
         finalCgst,

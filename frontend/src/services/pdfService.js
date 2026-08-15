@@ -407,7 +407,8 @@ export function generateInvoicePDF(invoice, options = {}) {
       item.product_name || 'N/A',
       itemHsn(item),
       formatCurrencyPDF(item.unit_price),
-      `${item.quantity || 1}${item.unit ? ` ${item.unit}` : ''}`,
+      item.quantity || 1,
+      item.unit || 'pcs',
       discVal > 0 ? `${discVal}%` : '–',
       gstVal > 0 ? `${gstVal}%` : '–',
       formatCurrencyPDF(item.total_price)
@@ -417,7 +418,7 @@ export function generateInvoicePDF(invoice, options = {}) {
   doc.autoTable({
     startY: tableStartY,
     margin: { left: 14, right: 14 },
-    head: [['#', 'Description', 'HSN', 'Rate', 'Qty', 'Disc', 'GST', 'Amount']],
+    head: [['Sr No.', 'Description', 'HSN', 'Rate', 'Qty', 'Unit', 'Disc', 'GST', 'Amount']],
     body: tableData,
     headStyles: {
       fillColor: BRAND_COLOR,
@@ -426,14 +427,15 @@ export function generateInvoicePDF(invoice, options = {}) {
       fontSize: 8.5
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
+      0: { cellWidth: 14, halign: 'center' },
       1: { cellWidth: 'auto', halign: 'left' },
-      2: { cellWidth: 28, halign: 'center' },
-      3: { cellWidth: 26, halign: 'right' },
-      4: { cellWidth: 14, halign: 'center' },
-      5: { cellWidth: 16, halign: 'right' },
-      6: { cellWidth: 16, halign: 'right' },
-      7: { cellWidth: 28, halign: 'right' }
+      2: { cellWidth: 22, halign: 'center' },
+      3: { cellWidth: 24, halign: 'right' },
+      4: { cellWidth: 12, halign: 'center' },
+      5: { cellWidth: 14, halign: 'center' },
+      6: { cellWidth: 14, halign: 'right' },
+      7: { cellWidth: 14, halign: 'right' },
+      8: { cellWidth: 26, halign: 'right' }
     },
     styles: {
       fontSize: 8,
@@ -456,7 +458,7 @@ export function generateInvoicePDF(invoice, options = {}) {
     rightX
   });
 
-  if (parseFloat(invoice.discount_amount) > 0) {
+  if (invoice.bill_type !== 'commercial' && parseFloat(invoice.discount_amount) > 0) {
     currentY = drawSummaryRow(doc, {
       label: 'Overall Bill Discount:',
       value: `- ${formatCurrencyPDF(invoice.discount_amount)}`,
@@ -643,6 +645,7 @@ export function generateQuotationPDF(quotation, options = {}) {
       itemHsn(item),
       formatCurrencyPDF(item.unit_price),
       item.quantity || 1,
+      item.unit || 'pcs',
       discVal > 0 ? `${discVal}%` : '–',
       gstVal > 0 ? `${gstVal}%` : '–',
       formatCurrencyPDF(item.total_price)
@@ -652,7 +655,7 @@ export function generateQuotationPDF(quotation, options = {}) {
   doc.autoTable({
     startY: tableStartY,
     margin: { left: 14, right: 14 },
-    head: [['#', 'Product Description', 'HSN', 'Rate', 'Qty', 'Disc %', 'GST %', 'Total Amount']],
+    head: [['Sr No.', 'Product Description', 'HSN', 'Rate', 'Qty', 'Unit', 'Disc %', 'GST %', 'Total Amount']],
     body: tableData,
     headStyles: {
       fillColor: BRAND_COLOR,
@@ -661,14 +664,15 @@ export function generateQuotationPDF(quotation, options = {}) {
       fontSize: 8.5
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
+      0: { cellWidth: 14, halign: 'center' },
       1: { cellWidth: 'auto', halign: 'left' },
       2: { cellWidth: 22, halign: 'center' },
-      3: { cellWidth: 26, halign: 'right' },
-      4: { cellWidth: 14, halign: 'center' },
-      5: { cellWidth: 16, halign: 'right' },
-      6: { cellWidth: 16, halign: 'right' },
-      7: { cellWidth: 28, halign: 'right' }
+      3: { cellWidth: 24, halign: 'right' },
+      4: { cellWidth: 12, halign: 'center' },
+      5: { cellWidth: 14, halign: 'center' },
+      6: { cellWidth: 14, halign: 'right' },
+      7: { cellWidth: 14, halign: 'right' },
+      8: { cellWidth: 26, halign: 'right' }
     },
     styles: {
       fontSize: 8,

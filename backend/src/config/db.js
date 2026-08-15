@@ -385,6 +385,7 @@ function initDb() {
   runMigration(`ALTER TABLE invoices ADD COLUMN cancelled_at DATETIME`);
   runMigration(`ALTER TABLE invoices ADD COLUMN cancel_reason TEXT`);
   runMigration(`ALTER TABLE invoices ADD COLUMN po_number TEXT DEFAULT ''`);
+  runMigration(`ALTER TABLE invoices ADD COLUMN bill_type TEXT DEFAULT 'customer'`);
 
   runMigration(`ALTER TABLE invoice_items ADD COLUMN hsn_sac TEXT DEFAULT ''`);
   runMigration(`ALTER TABLE invoice_items ADD COLUMN unit TEXT DEFAULT 'pcs'`);
@@ -729,6 +730,67 @@ function initDb() {
     } catch (err) {
       // Skip if SKU collision on a renamed row — never wipe existing catalog
       console.warn(`[seed] Skipped reference product "${p.name}":`, err.message);
+    }
+  }
+
+  // TEMPORARY: this only protects products that exist at time of writing. Any product added after this point will still be lost on Vercel cold start until the backend is moved to persistent hosting (see hosting migration plan). Do not let this be mistaken for a permanent fix in the codebase or in communication with the client.
+  const liveSeedProducts = [
+    { name: 'Brass Pressure Cooker 5L', barcode: '890100000001', sku: 'SKU-COOKER-05L', category: 'Cookware', brand: 'Prabhuratna', purchase_price: 1200.0, selling_price: 1850.0, discount_percent: 5.0, gst_percent: 18.0, stock_quantity: 45, min_stock_level: 10, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'Stainless Steel Dinner Set 24Pcs', barcode: '890100000002', sku: 'SKU-DINSET-24P', category: 'Dinnerware', brand: 'Prabhuratna', purchase_price: 1500.0, selling_price: 2499.0, discount_percent: 10.0, gst_percent: 18.0, stock_quantity: 20, min_stock_level: 5, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'Non-Stick Fry Pan 24cm', barcode: '890100000003', sku: 'SKU-FRYPAN-24C', category: 'Cookware', brand: 'Prabhuratna', purchase_price: 450.0, selling_price: 799.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 60, min_stock_level: 15, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'Copper Water Bottle 1000ml', barcode: '890100000004', sku: 'SKU-BOTTL-1000', category: 'Drinkware', brand: 'Prabhuratna', purchase_price: 350.0, selling_price: 599.0, discount_percent: 8.0, gst_percent: 18.0, stock_quantity: 8, min_stock_level: 10, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'Induction Base Kadai 3L', barcode: '890100000005', sku: 'SKU-KADAI-03L', category: 'Cookware', brand: 'Prabhuratna', purchase_price: 650.0, selling_price: 1050.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 3, min_stock_level: 5, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'Electric Rice Cooker 1.8L', barcode: '890100000006', sku: 'SKU-RICE-18L', category: 'Appliances', brand: 'Prabhuratna', purchase_price: 1400.0, selling_price: 2199.0, discount_percent: 12.0, gst_percent: 18.0, stock_quantity: 14, min_stock_level: 4, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'kadahai', barcode: '890745951663', sku: 'SKU-931096', category: 'Cookware', brand: 'Prabhuratna', purchase_price: 1000.0, selling_price: 1200.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 15, min_stock_level: 5, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'gas stove ', barcode: '890086535431', sku: 'SKU-535432', category: 'Appliances', brand: 'elica', purchase_price: 10000.0, selling_price: 12000.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 5, min_stock_level: 2, hsn_code: '', unit: 'pcs', show_on_website: 1 },
+    { name: 'prestige', barcode: '890160016576', sku: 'SKU-016576', category: 'Appliances', brand: 'Prabhuratna', purchase_price: 1100.0, selling_price: 1500.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 21, min_stock_level: 5, hsn_code: '', unit: 'pcs', show_on_website: 0 },
+    { name: 'HSN Test Pot', barcode: null, sku: 'SKU-HSN-TEST-001', category: 'General', brand: 'Generic', purchase_price: 300.0, selling_price: 500.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 7, min_stock_level: 5, hsn_code: '7323', unit: 'pcs', show_on_website: 1 },
+    { name: 'S.S. Cutlery Set with GoldLine', barcode: null, sku: 'SKU-REF-CUTLERY-GL', category: 'Kitchenware', brand: 'Prabhuratna', purchase_price: 1725.0, selling_price: 2300.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '39249096', unit: 'pcs', show_on_website: 0 },
+    { name: 'Ocean Water Glass', barcode: null, sku: 'SKU-REF-OCEAN-WG', category: 'Glassware', brand: 'Ocean', purchase_price: 348.75, selling_price: 465.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '70132100', unit: 'pcs', show_on_website: 0 },
+    { name: 'Ocean Juice Glass', barcode: null, sku: 'SKU-REF-OCEAN-JG', category: 'Glassware', brand: 'Ocean', purchase_price: 363.75, selling_price: 485.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '70132100', unit: 'pcs', show_on_website: 0 },
+    { name: 'S.S. Tea Thermos 2 Ltr', barcode: null, sku: 'SKU-REF-THERMOS-2L', category: 'Kitchenware', brand: 'Prabhuratna', purchase_price: 1230.0, selling_price: 1640.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '96170012', unit: 'pcs', show_on_website: 0 },
+    { name: 'Hawkins Single Induction', barcode: null, sku: 'SKU-REF-HAWK-IND', category: 'Appliances', brand: 'Hawkins', purchase_price: 2790.0, selling_price: 3720.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '85167100', unit: 'pcs', show_on_website: 0 },
+    { name: 'S.S. Top Big Heavy Duty', barcode: null, sku: 'SKU-REF-SSTOP-BIG', category: 'Cookware', brand: 'Prabhuratna', purchase_price: 2343.75, selling_price: 3125.0, discount_percent: 0.0, gst_percent: 5.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '73239190', unit: 'pcs', show_on_website: 0 },
+    { name: 'Milton Tea Coaster Big', barcode: null, sku: 'SKU-REF-MILTON-TCB', category: 'Kitchenware', brand: 'Milton', purchase_price: 139.5, selling_price: 186.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '39249090', unit: 'pcs', show_on_website: 0 },
+    { name: 'Milton Tea Coaster Medium', barcode: null, sku: 'SKU-REF-MILTON-TCM', category: 'Kitchenware', brand: 'Milton', purchase_price: 117.0, selling_price: 156.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '39249090', unit: 'pcs', show_on_website: 0 },
+    { name: 'S.S. Sandwich Bottom Top with Cover', barcode: null, sku: 'SKU-REF-SS-SAND', category: 'Cookware', brand: 'Prabhuratna', purchase_price: 551.25, selling_price: 735.0, discount_percent: 0.0, gst_percent: 5.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '73239190', unit: 'pcs', show_on_website: 0 },
+    { name: 'Melamine Serving Spoon', barcode: null, sku: 'SKU-REF-MEL-SPOON', category: 'Kitchenware', brand: 'Prabhuratna', purchase_price: 127.5, selling_price: 170.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '39249090', unit: 'pcs', show_on_website: 0 },
+    { name: 'Dabbo Heavy', barcode: null, sku: 'SKU-REF-DABBO-HVY', category: 'Kitchenware', brand: 'Prabhuratna', purchase_price: 183.75, selling_price: 245.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '39249090', unit: 'pcs', show_on_website: 0 },
+    { name: 'S.S. Laddle for Dal - Heavy', barcode: null, sku: 'SKU-REF-SS-LADDLE', category: 'Kitchenware', brand: 'Prabhuratna', purchase_price: 176.25, selling_price: 235.0, discount_percent: 0.0, gst_percent: 18.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '39249090', unit: 'pcs', show_on_website: 0 },
+    { name: 'Cup Saucer', barcode: null, sku: 'SKU-REF-CUP-SAUCER', category: 'Dinnerware', brand: 'Prabhuratna', purchase_price: 1830.0, selling_price: 2440.0, discount_percent: 0.0, gst_percent: 5.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '69111011', unit: 'pcs', show_on_website: 0 },
+    { name: 'Copper Pooja Plate', barcode: null, sku: 'SKU-REF-CU-POOJA', category: 'Pooja Items', brand: 'Prabhuratna', purchase_price: 183.75, selling_price: 245.0, discount_percent: 0.0, gst_percent: 5.0, stock_quantity: 10, min_stock_level: 3, hsn_code: '73239190', unit: 'pcs', show_on_website: 0 }
+  ];
+
+  const findLiveProduct = db.prepare('SELECT id FROM products WHERE name = ?');
+  const insertLiveProduct = db.prepare(`
+    INSERT INTO products
+      (name, barcode, sku, category, brand, purchase_price, selling_price, discount_percent,
+       gst_percent, stock_quantity, min_stock_level, hsn_code, hsn_sac, unit, show_on_website)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const p of liveSeedProducts) {
+    if (findLiveProduct.get(p.name)) continue;
+    try {
+      insertLiveProduct.run(
+        p.name,
+        p.barcode || null,
+        p.sku,
+        p.category,
+        p.brand,
+        p.purchase_price,
+        p.selling_price,
+        p.discount_percent || 0,
+        p.gst_percent || 0,
+        p.stock_quantity || 10,
+        p.min_stock_level || 3,
+        p.hsn_code || '',
+        p.hsn_code || '',
+        p.unit || 'pcs',
+        p.show_on_website !== undefined ? p.show_on_website : 1
+      );
+    } catch (err) {
+      console.warn(`[seed] Skipped live seed product "${p.name}":`, err.message);
     }
   }
 }

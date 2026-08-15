@@ -35,7 +35,7 @@ export default function BillingPage() {
     product_name: '', unit_price: '', quantity: 1, gst_percent: 18, hsn_sac: '', unit: 'pcs'
   });
   
-  // Checkout & Customer State
+  const [billType, setBillType] = useState('customer'); // 'customer' | 'commercial'
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -243,7 +243,11 @@ export default function BillingPage() {
     setCartItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const cartTotals = calculateCartTotals(cartItems, overallDiscount, scrapValue);
+  const effectiveOverallDiscount = billType === 'commercial' ? 0 : overallDiscount;
+  const effectiveCartItems = billType === 'commercial'
+    ? cartItems.map(item => ({ ...item, discount_percent: 0 }))
+    : cartItems;
+  const cartTotals = calculateCartTotals(effectiveCartItems, effectiveOverallDiscount, scrapValue);
   const transportVal = Math.max(0, parseFloat(transportAmount) || 0);
   const parsedCgst = Math.max(0, parseFloat(cgstAmount) || 0);
   const parsedSgst = Math.max(0, parseFloat(sgstAmount) || 0);
@@ -313,6 +317,7 @@ export default function BillingPage() {
         customer_pan: customerPan,
         customer_address: customerAddress,
         po_number: poNumber,
+        bill_type: billType,
         invoice_number: invoiceNumberOverride,
         invoice_date: invoiceDate || todayLocalDate(),
         is_inter_state: taxMode === 'IGST',
@@ -321,7 +326,7 @@ export default function BillingPage() {
         igst_amount: parsedIgst,
         payment_mode: paymentMode,
         amount_paid: paid,
-        discount_amount: cartTotals.billDiscountAmount,
+        discount_amount: billType === 'commercial' ? 0 : cartTotals.billDiscountAmount,
         scrap_value: cartTotals.scrapValue,
         transport_amount: transportVal,
         round_off: 0,
@@ -336,7 +341,7 @@ export default function BillingPage() {
           gauge: item.gauge || '',
           unit_price: parseFloat(item.unit_price) || 0,
           quantity: parseFloat(item.quantity) || 1,
-          discount_percent: parseFloat(item.discount_percent) || 0,
+          discount_percent: billType === 'commercial' ? 0 : (parseFloat(item.discount_percent) || 0),
           gst_percent: parseFloat(item.gst_percent) || 0,
           is_custom: Boolean(item.is_custom)
         }))
@@ -539,7 +544,7 @@ export default function BillingPage() {
                     <th className="px-4 py-3">Product Name & SKU</th>
                     <th className="px-3 py-3">Rate</th>
                     <th className="px-3 py-3 text-center">Qty</th>
-                    <th className="px-3 py-3 text-center">Disc %</th>
+                    {billType !== 'commercial' && <th className="px-3 py-3 text-center">Disc %</th>}
                     <th className="px-3 py-3 text-center">GST %</th>
                     <th className="px-4 py-3 text-right">Subtotal</th>
                     <th className="px-3 py-3 text-center">Action</th>
@@ -548,7 +553,7 @@ export default function BillingPage() {
                 <tbody className="divide-y divide-slate-200 dark:divide-[#2D3138]">
                   {cartItems.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-16 text-center text-slate-500 dark:text-[#9CA3AF]">
+                      <td colSpan={billType === 'commercial' ? 6 : 7} className="px-4 py-16 text-center text-slate-500 dark:text-[#9CA3AF]">
                         <Search className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-600" />
                         <p className="font-semibold text-slate-700 dark:text-[#F1F1F1]">Search catalog above to add items</p>
                         <p className="text-xs text-slate-500 dark:text-[#9CA3AF]">Type product name, SKU, or HSN to find and add items</p>
@@ -585,14 +590,16 @@ export default function BillingPage() {
                               </button>
                             </div>
                           </td>
-                          <td className="px-3 py-3 text-center">
-                            <input
-                              type="number"
-                              value={item.discount_percent}
-                              onChange={(e) => updateDiscount(idx, e.target.value)}
-                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
-                            />
-                          </td>
+                          {billType !== 'commercial' && (
+                            <td className="px-3 py-3 text-center">
+                              <input
+                                type="number"
+                                value={item.discount_percent}
+                                onChange={(e) => updateDiscount(idx, e.target.value)}
+                                className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
+                              />
+                            </td>
+                          )}
                           <td className="px-3 py-3 text-center">
                             <input
                               type="number"
@@ -679,13 +686,15 @@ export default function BillingPage() {
                         </div>
 
                         <div className="flex items-center gap-2 text-xs">
-                          <input
-                            type="number"
-                            value={item.discount_percent}
-                            onChange={(e) => updateDiscount(idx, e.target.value)}
-                            className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
-                            placeholder="Disc %"
-                          />
+                          {billType !== 'commercial' && (
+                            <input
+                              type="number"
+                              value={item.discount_percent}
+                              onChange={(e) => updateDiscount(idx, e.target.value)}
+                              className="w-12 p-1 text-center bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-lg text-slate-900 dark:text-[#F1F1F1]"
+                              placeholder="Disc %"
+                            />
+                          )}
                           <input
                             type="number"
                             value={item.gst_percent}
@@ -709,6 +718,37 @@ export default function BillingPage() {
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-[#F1F1F1] flex items-center gap-2 border-b border-slate-200 dark:border-[#2D3138] pb-3">
               <CreditCard className="w-4 h-4 text-[#C0392B] dark:text-[#E74C3C]" /> Checkout Summary
             </h3>
+
+            {/* Bill Type Selector */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
+                Billing Type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBillType('customer')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    billType === 'customer'
+                      ? 'bg-[#C0392B]/10 dark:bg-[#E74C3C]/10 border-[#C0392B] dark:border-[#E74C3C] text-[#C0392B] dark:text-[#E74C3C]'
+                      : 'bg-white dark:bg-[#121417] border-slate-200 dark:border-[#2D3138] text-slate-600 dark:text-[#9CA3AF] hover:bg-slate-100 dark:hover:bg-[#1E2126]'
+                  }`}
+                >
+                  Customer Bill
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillType('commercial')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    billType === 'commercial'
+                      ? 'bg-[#C0392B]/10 dark:bg-[#E74C3C]/10 border-[#C0392B] dark:border-[#E74C3C] text-[#C0392B] dark:text-[#E74C3C]'
+                      : 'bg-white dark:bg-[#121417] border-slate-200 dark:border-[#2D3138] text-slate-600 dark:text-[#9CA3AF] hover:bg-slate-100 dark:hover:bg-[#1E2126]'
+                  }`}
+                >
+                  Commercial Bill
+                </button>
+              </div>
+            </div>
 
             {/* Customer & Billing Inputs */}
             <div className="space-y-3">
@@ -780,19 +820,21 @@ export default function BillingPage() {
                 className="min-w-0"
               />
 
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="min-w-0">
-                  <Input
-                    label="Disc %"
-                    type="number"
-                    value={overallDiscount}
-                    onChange={(e) => setOverallDiscount(e.target.value)}
-                    placeholder="0"
-                    min="0"
-                    step="0.01"
-                    className="min-w-0 [&_input]:min-w-0 [&_input]:appearance-none"
-                  />
-                </div>
+              <div className={`grid ${billType === 'commercial' ? 'grid-cols-2' : 'grid-cols-3'} gap-2 sm:gap-3`}>
+                {billType !== 'commercial' && (
+                  <div className="min-w-0">
+                    <Input
+                      label="Disc %"
+                      type="number"
+                      value={overallDiscount}
+                      onChange={(e) => setOverallDiscount(e.target.value)}
+                      placeholder="0"
+                      min="0"
+                      step="0.01"
+                      className="min-w-0 [&_input]:min-w-0 [&_input]:appearance-none"
+                    />
+                  </div>
+                )}
                 <div className="min-w-0">
                   <Input
                     label="Scrap ₹"
