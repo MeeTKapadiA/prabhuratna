@@ -36,6 +36,7 @@ export default function BillingPage() {
   });
   
   const [billType, setBillType] = useState('customer'); // 'customer' | 'commercial'
+  const [salutation, setSalutation] = useState('Mr.'); // 'Mr.' | 'M/s' | 'Mrs.' | 'Ms.' | 'Dr.' | ''
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -309,8 +310,19 @@ export default function BillingPage() {
           ? trimmedInvoiceNo
           : '';
 
+      const trimmedCustName = customerName.trim();
+      let formattedCustomerName = 'Walk-in Customer';
+      if (trimmedCustName) {
+        const hasSalutation = /^(mr|m\/s|mrs|ms|dr)\.?\s+/i.test(trimmedCustName);
+        if (salutation && !hasSalutation) {
+          formattedCustomerName = `${salutation} ${trimmedCustName}`;
+        } else {
+          formattedCustomerName = trimmedCustName;
+        }
+      }
+
       const payload = {
-        customer_name: customerName,
+        customer_name: formattedCustomerName,
         customer_phone: customerPhone,
         customer_email: customerEmail,
         customer_gstin: customerGstin,
@@ -361,6 +373,7 @@ export default function BillingPage() {
         setIsInvoiceModalOpen(true);
         setCartItems([]);
         setCustomerName('');
+        setSalutation(billType === 'commercial' ? 'M/s' : 'Mr.');
         setCustomerPhone('');
         setCustomerEmail('');
         setCustomerGstin('');
@@ -727,7 +740,10 @@ export default function BillingPage() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setBillType('customer')}
+                  onClick={() => {
+                    setBillType('customer');
+                    if (salutation === 'M/s') setSalutation('Mr.');
+                  }}
                   className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                     billType === 'customer'
                       ? 'bg-[#C0392B]/10 dark:bg-[#E74C3C]/10 border-[#C0392B] dark:border-[#E74C3C] text-[#C0392B] dark:text-[#E74C3C]'
@@ -738,7 +754,10 @@ export default function BillingPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setBillType('commercial')}
+                  onClick={() => {
+                    setBillType('commercial');
+                    if (salutation === 'Mr.') setSalutation('M/s');
+                  }}
                   className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                     billType === 'commercial'
                       ? 'bg-[#C0392B]/10 dark:bg-[#E74C3C]/10 border-[#C0392B] dark:border-[#E74C3C] text-[#C0392B] dark:text-[#E74C3C]'
@@ -753,13 +772,32 @@ export default function BillingPage() {
             {/* Customer & Billing Inputs */}
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Customer Name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Walk-in Customer"
-                  className="min-w-0"
-                />
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-[#9CA3AF]">
+                    Customer Name
+                  </label>
+                  <div className="flex gap-1.5">
+                    <select
+                      value={salutation}
+                      onChange={(e) => setSalutation(e.target.value)}
+                      className="w-20 px-2 py-2 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-xs font-bold text-slate-900 dark:text-[#F1F1F1] focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C] cursor-pointer"
+                    >
+                      <option value="Mr.">Mr.</option>
+                      <option value="M/s">M/s</option>
+                      <option value="Mrs.">Mrs.</option>
+                      <option value="Ms.">Ms.</option>
+                      <option value="Dr.">Dr.</option>
+                      <option value="">None</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Walk-in Customer"
+                      className="flex-1 min-w-0 px-3 py-2 bg-white dark:bg-[#121417] border border-slate-300 dark:border-[#2D3138] rounded-xl text-xs text-slate-900 dark:text-[#F1F1F1] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#C0392B] dark:focus:border-[#E74C3C]"
+                    />
+                  </div>
+                </div>
                 <Input
                   label="Phone Number"
                   value={customerPhone}
