@@ -398,9 +398,24 @@ export function generateInvoicePDF(invoice, options = {}) {
   const tableStartY = afterHeaderY + boxHeight + 6;
 
   // 4. Items Table
+  const isCommercial = String(invoice.bill_type || '').toLowerCase() === 'commercial';
+
   const tableData = (invoice.items || []).map((item, idx) => {
     const discVal = parseFloat(item.discount_percent);
     const gstVal = parseFloat(item.gst_percent);
+
+    if (isCommercial) {
+      return [
+        idx + 1,
+        item.product_name || 'N/A',
+        itemHsn(item),
+        formatCurrencyPDF(item.unit_price),
+        item.quantity || 1,
+        item.unit || 'pcs',
+        gstVal > 0 ? `${gstVal}%` : '–',
+        formatCurrencyPDF(item.total_price)
+      ];
+    }
 
     return [
       idx + 1,
@@ -415,10 +430,37 @@ export function generateInvoicePDF(invoice, options = {}) {
     ];
   });
 
+  const tableHead = isCommercial
+    ? [['Sr No.', 'Description', 'HSN', 'Rate', 'Qty', 'Unit', 'GST', 'Amount']]
+    : [['Sr No.', 'Description', 'HSN', 'Rate', 'Qty', 'Unit', 'Disc', 'GST', 'Amount']];
+
+  const columnStyles = isCommercial
+    ? {
+        0: { cellWidth: 14, halign: 'center' },
+        1: { cellWidth: 'auto', halign: 'left' },
+        2: { cellWidth: 24, halign: 'center' },
+        3: { cellWidth: 26, halign: 'right' },
+        4: { cellWidth: 14, halign: 'center' },
+        5: { cellWidth: 16, halign: 'center' },
+        6: { cellWidth: 16, halign: 'right' },
+        7: { cellWidth: 28, halign: 'right' }
+      }
+    : {
+        0: { cellWidth: 14, halign: 'center' },
+        1: { cellWidth: 'auto', halign: 'left' },
+        2: { cellWidth: 22, halign: 'center' },
+        3: { cellWidth: 24, halign: 'right' },
+        4: { cellWidth: 12, halign: 'center' },
+        5: { cellWidth: 14, halign: 'center' },
+        6: { cellWidth: 14, halign: 'right' },
+        7: { cellWidth: 14, halign: 'right' },
+        8: { cellWidth: 26, halign: 'right' }
+      };
+
   doc.autoTable({
     startY: tableStartY,
     margin: { left: 14, right: 14 },
-    head: [['Sr No.', 'Description', 'HSN', 'Rate', 'Qty', 'Unit', 'Disc', 'GST', 'Amount']],
+    head: tableHead,
     body: tableData,
     headStyles: {
       fillColor: BRAND_COLOR,
@@ -426,23 +468,21 @@ export function generateInvoicePDF(invoice, options = {}) {
       fontStyle: 'bold',
       fontSize: 8.5
     },
-    columnStyles: {
-      0: { cellWidth: 14, halign: 'center' },
-      1: { cellWidth: 'auto', halign: 'left' },
-      2: { cellWidth: 22, halign: 'center' },
-      3: { cellWidth: 24, halign: 'right' },
-      4: { cellWidth: 12, halign: 'center' },
-      5: { cellWidth: 14, halign: 'center' },
-      6: { cellWidth: 14, halign: 'right' },
-      7: { cellWidth: 14, halign: 'right' },
-      8: { cellWidth: 26, halign: 'right' }
-    },
+    columnStyles,
     styles: {
       fontSize: 8,
       cellPadding: 3,
       overflow: 'linebreak'
     },
-    alternateRowStyles: { fillColor: [248, 250, 252] }
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    didParseCell: (data) => {
+      if (data.section === 'head') {
+        const colStyle = columnStyles[data.column.index];
+        if (colStyle && colStyle.halign) {
+          data.cell.styles.halign = colStyle.halign;
+        }
+      }
+    }
   });
 
   // 5. Totals Breakdown — width-safe label/value pairs (no overlap)
@@ -635,9 +675,24 @@ export function generateQuotationPDF(quotation, options = {}) {
 
   const tableStartY = afterHeaderY + boxHeight + 6;
 
+  const isCommercial = String(quotation.bill_type || '').toLowerCase() === 'commercial';
+
   const tableData = (quotation.items || []).map((item, idx) => {
     const discVal = parseFloat(item.discount_percent);
     const gstVal = parseFloat(item.gst_percent);
+
+    if (isCommercial) {
+      return [
+        idx + 1,
+        item.product_name || 'N/A',
+        itemHsn(item),
+        formatCurrencyPDF(item.unit_price),
+        item.quantity || 1,
+        item.unit || 'pcs',
+        gstVal > 0 ? `${gstVal}%` : '–',
+        formatCurrencyPDF(item.total_price)
+      ];
+    }
 
     return [
       idx + 1,
@@ -652,10 +707,37 @@ export function generateQuotationPDF(quotation, options = {}) {
     ];
   });
 
+  const tableHead = isCommercial
+    ? [['Sr No.', 'Product Description', 'HSN', 'Rate', 'Qty', 'Unit', 'GST %', 'Total Amount']]
+    : [['Sr No.', 'Product Description', 'HSN', 'Rate', 'Qty', 'Unit', 'Disc %', 'GST %', 'Total Amount']];
+
+  const columnStyles = isCommercial
+    ? {
+        0: { cellWidth: 14, halign: 'center' },
+        1: { cellWidth: 'auto', halign: 'left' },
+        2: { cellWidth: 24, halign: 'center' },
+        3: { cellWidth: 26, halign: 'right' },
+        4: { cellWidth: 14, halign: 'center' },
+        5: { cellWidth: 16, halign: 'center' },
+        6: { cellWidth: 16, halign: 'right' },
+        7: { cellWidth: 28, halign: 'right' }
+      }
+    : {
+        0: { cellWidth: 14, halign: 'center' },
+        1: { cellWidth: 'auto', halign: 'left' },
+        2: { cellWidth: 22, halign: 'center' },
+        3: { cellWidth: 24, halign: 'right' },
+        4: { cellWidth: 12, halign: 'center' },
+        5: { cellWidth: 14, halign: 'center' },
+        6: { cellWidth: 14, halign: 'right' },
+        7: { cellWidth: 14, halign: 'right' },
+        8: { cellWidth: 26, halign: 'right' }
+      };
+
   doc.autoTable({
     startY: tableStartY,
     margin: { left: 14, right: 14 },
-    head: [['Sr No.', 'Product Description', 'HSN', 'Rate', 'Qty', 'Unit', 'Disc %', 'GST %', 'Total Amount']],
+    head: tableHead,
     body: tableData,
     headStyles: {
       fillColor: BRAND_COLOR,
@@ -663,23 +745,21 @@ export function generateQuotationPDF(quotation, options = {}) {
       fontStyle: 'bold',
       fontSize: 8.5
     },
-    columnStyles: {
-      0: { cellWidth: 14, halign: 'center' },
-      1: { cellWidth: 'auto', halign: 'left' },
-      2: { cellWidth: 22, halign: 'center' },
-      3: { cellWidth: 24, halign: 'right' },
-      4: { cellWidth: 12, halign: 'center' },
-      5: { cellWidth: 14, halign: 'center' },
-      6: { cellWidth: 14, halign: 'right' },
-      7: { cellWidth: 14, halign: 'right' },
-      8: { cellWidth: 26, halign: 'right' }
-    },
+    columnStyles,
     styles: {
       fontSize: 8,
       cellPadding: 3,
       overflow: 'linebreak'
     },
-    alternateRowStyles: { fillColor: [248, 250, 252] }
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    didParseCell: (data) => {
+      if (data.section === 'head') {
+        const colStyle = columnStyles[data.column.index];
+        if (colStyle && colStyle.halign) {
+          data.cell.styles.halign = colStyle.halign;
+        }
+      }
+    }
   });
 
   let currentY = doc.lastAutoTable.finalY + 8;
