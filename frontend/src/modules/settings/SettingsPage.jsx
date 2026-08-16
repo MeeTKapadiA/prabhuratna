@@ -12,6 +12,7 @@ export default function SettingsPage() {
     shop_phone: '',
     shop_email: '',
     shop_gstin: '',
+    shop_pan: '',
     owner_whatsapp: '',
     logo_url: '',
     invoice_footer_note: '',
@@ -41,6 +42,7 @@ export default function SettingsPage() {
           shop_phone: res.settings.shop_phone || '',
           shop_email: res.settings.shop_email || '',
           shop_gstin: res.settings.shop_gstin || '',
+          shop_pan: res.settings.shop_pan || '',
           owner_whatsapp: res.settings.owner_whatsapp || '',
           logo_url: res.settings.logo_url || '',
           invoice_footer_note: res.settings.invoice_footer_note || '',
@@ -227,6 +229,12 @@ export default function SettingsPage() {
               value={formData.shop_gstin}
               onChange={(e) => handleInputChange('shop_gstin', e.target.value)}
               placeholder="e.g. 24ABCDE1234F1Z5"
+            />
+            <Input
+              label="PAN Number"
+              value={formData.shop_pan}
+              onChange={(e) => handleInputChange('shop_pan', e.target.value.toUpperCase())}
+              placeholder="e.g. ABCDE1234F"
             />
             <Input
               label="Owner WhatsApp (low-stock alerts)"

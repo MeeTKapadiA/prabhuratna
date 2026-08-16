@@ -6,6 +6,7 @@ const ALLOWED_SETTING_KEYS = [
   'shop_phone',
   'shop_email',
   'shop_gstin',
+  'shop_pan',
   'shop_state_code',
   'logo_base64',
   'logo_url',
@@ -48,6 +49,7 @@ exports.getPublicSettings = (req, res) => {
         shop_phone: all.shop_phone || '',
         shop_email: all.shop_email || '',
         shop_gstin: all.shop_gstin || '',
+        shop_pan: all.shop_pan || '',
         logo_base64: all.logo_base64 || '',
         logo_url: all.logo_url || '',
         invoice_footer_note: all.invoice_footer_note || ''

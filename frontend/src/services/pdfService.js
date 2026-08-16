@@ -54,6 +54,7 @@ function drawShopHeaderBlock(doc, {
   shopName,
   shopAddress,
   shopGstin,
+  shopPan,
   shopPhone,
   shopEmail,
   metaRows = [],
@@ -90,6 +91,16 @@ function drawShopHeaderBlock(doc, {
     doc.text(line, leftX, y);
     y += lineH;
   });
+
+  const shopPanStr = String(shopPan || '').trim();
+  if (shopPanStr) {
+    const panLines = doc.splitTextToSize(`PAN: ${shopPanStr}`, leftMaxWidth);
+    panLines.forEach((line) => {
+      doc.text(line, leftX, y);
+      y += lineH;
+    });
+  }
+
   const emailLines = doc.splitTextToSize(`Email: ${shopEmail || ''}`, leftMaxWidth);
   emailLines.forEach((line) => {
     doc.text(line, leftX, y);
@@ -361,6 +372,7 @@ export function generateInvoicePDF(invoice, options = {}) {
     shopName,
     shopAddress,
     shopGstin,
+    shopPan: settings.shop_pan,
     shopPhone,
     shopEmail,
     metaRows
@@ -640,6 +652,7 @@ export function generateQuotationPDF(quotation, options = {}) {
     shopName,
     shopAddress,
     shopGstin,
+    shopPan: settings.shop_pan,
     shopPhone,
     shopEmail,
     metaRows

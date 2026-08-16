@@ -558,6 +558,7 @@ function initDb() {
     ['shop_phone', '+91 98765 43210'],
     ['shop_email', 'info@prabhuratna.com'],
     ['shop_gstin', '24ABCDE1234F1Z5'],
+    ['shop_pan', 'AAUFP637P'],
     ['shop_state_code', '24'],
     ['logo_base64', ''],
     ['logo_url', ''],

@@ -17,6 +17,7 @@ const PUBLIC_KEYS = [
   'shop_phone',
   'shop_email',
   'shop_gstin',
+  'shop_pan',
   'logo_base64',
   'logo_url',
   'invoice_footer_note',
